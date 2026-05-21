@@ -24,6 +24,12 @@ type Config struct {
 	MaxTabsPerBrowser int    `json:"maxTabsPerBrowser"`
 	AutoStart         bool   `json:"autoStart"`
 	Version           string `json:"version"`
+
+	// Remote Sync settings synced across all connected browser extensions
+	RelayEnabled      bool   `json:"relayEnabled"`
+	RelayURL          string `json:"relayUrl"`
+	RelayRoomID       string `json:"relayRoomId"`
+	RelaySecretKey    string `json:"relaySecretKey"`
 }
 
 var (

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="SyncTabs — View and manage your browser tabs from your phone">
+  <meta name="robots" content="noindex, nofollow">
+  <title>SyncTabs — Mobile Portal</title>
+
+  <!-- Preconnect for font performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+
+  <!-- ─── Header ──────────────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="4" width="28" height="20" rx="3" stroke="currentColor" stroke-width="2"/>
+          <rect x="8" y="8" width="16" height="2" rx="1" fill="currentColor" opacity="0.5"/>
+          <rect x="8" y="12" width="12" height="2" rx="1" fill="currentColor" opacity="0.3"/>
+          <line x1="16" y1="24" x2="16" y2="28" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="11" y1="28" x2="21" y2="28" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="logo-text">SyncTabs</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Connecting…</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── Pairing Screen (shown when no connection params) ────────── -->
+  <div class="screen pairing-screen" id="pairingScreen">
+    <div class="pairing-content">
+      <div class="pairing-icon">
+        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="8" y="8" width="24" height="24" rx="4" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="48" y="8" width="24" height="24" rx="4" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="8" y="48" width="24" height="24" rx="4" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="48" y="48" width="24" height="24" rx="4" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="14" y="14" width="12" height="12" rx="2" fill="currentColor" opacity="0.6"/>
+          <rect x="54" y="14" width="12" height="12" rx="2" fill="currentColor" opacity="0.4"/>
+          <rect x="14" y="54" width="12" height="12" rx="2" fill="currentColor" opacity="0.4"/>
+          <rect x="56" y="56" width="4" height="4" rx="1" fill="currentColor" opacity="0.6"/>
+          <rect x="60" y="56" width="4" height="4" rx="1" fill="currentColor" opacity="0.3"/>
+          <rect x="56" y="60" width="4" height="4" rx="1" fill="currentColor" opacity="0.3"/>
+        </svg>
+      </div>
+      <h1 class="pairing-title">Scan QR Code to Connect</h1>
+      <p class="pairing-subtitle">Open the SyncTabs extension on your desktop browser, go to <strong>Settings → Mobile Access</strong>, and scan the QR code with your phone's camera.</p>
+      <div class="pairing-steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-text">Open SyncTabs extension on desktop</div>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-text">Go to Settings → Mobile Access</div>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-text">Scan the QR code with your phone</div>
+        </div>
+      </div>
+      <div class="manual-connect">
+        <button class="btn-glass" id="manualConnectBtn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Connect Manually
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Main Content (shown when connected) ─────────────────────── -->
+  <div class="screen main-screen" id="mainScreen" style="display:none;">
+
+    <!-- Search Bar -->
+    <div id="search-bar" class="search-bar">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="search-input" type="text" placeholder="Search all tabs…" autocomplete="off" spellcheck="false">
+      <button id="search-clear" class="search-clear-btn" style="display: none;">✕</button>
+    </div>
+
+    <!-- Tab count summary -->
+    <div class="summary-bar" id="summaryBar">
+      <span class="summary-text" id="summaryText">No browsers connected</span>
+    </div>
+
+    <!-- Browser cards container -->
+    <div class="browsers-container" id="browsersContainer">
+      <!-- Browser cards are dynamically inserted here -->
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="10" width="52" height="36" rx="4" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+          <rect x="12" y="16" width="20" height="3" rx="1.5" fill="currentColor" opacity="0.15"/>
+          <rect x="12" y="22" width="32" height="3" rx="1.5" fill="currentColor" opacity="0.1"/>
+          <rect x="12" y="28" width="26" height="3" rx="1.5" fill="currentColor" opacity="0.1"/>
+          <circle cx="32" cy="55" r="4" stroke="currentColor" stroke-width="2" opacity="0.2"/>
+        </svg>
+      </div>
+      <p class="empty-title">No Tabs Yet</p>
+      <p class="empty-subtitle">Waiting for browser tab data…</p>
+    </div>
+
+    <!-- Send Tab Area -->
+    <div class="send-tab-area" id="sendTabArea">
+      <div class="send-tab-inner">
+        <div class="send-tab-input-wrap">
+          <svg class="send-tab-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M7.5 15h3a6 6 0 000-12h-3a6 6 0 000 12z" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6 9h6m0 0L9.5 6.5M12 9l-2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <input type="url" id="sendTabInput" class="send-tab-input" placeholder="Paste a URL to send to desktop…" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <button class="send-tab-btn" id="sendTabBtn" title="Send tab to desktop">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M3 10l14-7-7 14V10H3z" fill="currentColor"/>
+          </svg>
+        </button>
+      </div>
+      <div class="send-tab-feedback" id="sendTabFeedback"></div>
+    </div>
+  </div>
+
+  <!-- ─── Toast notification ──────────────────────────────────────── -->
+  <div class="toast" id="toast">
+    <span class="toast-text" id="toastText"></span>
+  </div>
+
+  <script src="portal.js"></script>
+</body>
+</html>

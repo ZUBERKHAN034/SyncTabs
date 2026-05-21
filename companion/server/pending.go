@@ -19,6 +19,9 @@ type PendingTab struct {
 	URL               string `json:"url"`
 	Title             string `json:"title"`
 	FavIconURL        string `json:"favIconUrl"`
+	Pinned            bool   `json:"pinned"`
+	GroupTitle        string `json:"groupTitle,omitempty"`
+	GroupColor        string `json:"groupColor,omitempty"`
 	SenderBrowserID   string `json:"senderBrowserId"`
 	SenderBrowserName string `json:"senderBrowserName"`
 	SentAt            string `json:"sentAt"`

@@ -158,6 +158,69 @@
     </div>
   </div>
 
+  <!-- E2EE Remote Sync -->
+  <div class="section" id="section-relay">
+    <h2>🔒 E2EE Remote Sync</h2>
+
+    <div class="toggle-row">
+      <div class="label-group">
+        <div class="name">Enable relay sync</div>
+        <div class="desc">Sync tabs across networks via an encrypted relay server</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-relay">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div id="relay-config" style="display:none">
+      <div class="field">
+        <label>Relay Server URL</label>
+        <input type="text" id="input-relay-url" placeholder="wss://your-relay.example.com">
+        <div class="hint">WebSocket URL of your relay server (wss:// recommended for security)</div>
+      </div>
+
+      <div class="status-row" id="relay-status-row">
+        <span class="status-dot" id="relay-status-dot"></span>
+        <span class="status-text" id="relay-status-text">Not connected</span>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-generate-pairing">Generate Pairing</button>
+        <button class="btn btn-primary" id="btn-save-relay">Save Settings</button>
+        <span class="saved-msg" id="relay-saved-msg">Saved!</span>
+      </div>
+
+      <div id="relay-qr-area" class="relay-qr-area" style="display:none">
+        <div class="relay-qr-label">Scan this QR code from another device to pair:</div>
+        <canvas id="relay-qr-canvas" width="200" height="200"></canvas>
+        <div class="relay-qr-payload" id="relay-qr-payload"></div>
+      </div>
+
+      <div class="info-box" style="margin-top:14px">
+        <strong>End-to-end encrypted</strong><br>
+        All tab data is encrypted with AES-GCM before leaving your browser.
+        The relay server only sees opaque ciphertext — it cannot read your tabs or URLs.
+        The encryption key never leaves your devices.
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Snapshots -->
+  <section class="card">
+    <h2>📸 Session Snapshots</h2>
+    <p class="card-desc">Your tab sessions are automatically saved daily. Restore them to recover from crashes or accidental window closures.</p>
+
+    <div class="row" style="margin-bottom: 12px">
+      <button id="btn-create-snapshot" class="btn btn-primary">Create Snapshot Now</button>
+      <span id="snapshot-saved-msg" class="saved-msg">Saved!</span>
+    </div>
+
+    <div id="snapshot-list" class="snapshot-list">
+      <p class="text-muted">Loading snapshots…</p>
+    </div>
+  </section>
+
   <!-- Permission -->
   <div class="section" id="section-permission">
     <h2>🔐 Permission</h2>

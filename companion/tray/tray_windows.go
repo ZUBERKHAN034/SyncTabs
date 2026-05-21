@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"fyne.io/systray"
 	"github.com/harshvasudeva/synctabs-companion/logger"
 )
 
@@ -48,3 +49,9 @@ func showNotification(title, message string) {
 func getAutoStartLabel() string {
 	return "Start with Windows"
 }
+
+// setTrayIcon sets a standard icon on Windows
+func setTrayIcon(iconBytes []byte) {
+	systray.SetIcon(iconBytes)
+}
+

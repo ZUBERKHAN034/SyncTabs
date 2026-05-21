@@ -124,6 +124,11 @@ function validateTabArray(tabs) {
     active: !!t.active,
     lastAccessed: typeof t.lastAccessed === 'number' ? t.lastAccessed : Date.now(),
     incognito: !!t.incognito,
+    index: typeof t.index === 'number' ? t.index : 0,
+    groupId: typeof t.groupId === 'number' ? t.groupId : -1,
+    groupTitle: typeof t.groupTitle === 'string' ? t.groupTitle.slice(0, MAX_TITLE_LENGTH) : '',
+    groupColor: typeof t.groupColor === 'string' ? t.groupColor.slice(0, 100) : '',
+    discarded: !!t.discarded,
   }));
 }
 
@@ -300,6 +305,9 @@ wss.on('connection', (ws) => {
           url: String(msg.tab.url).slice(0, MAX_URL_LENGTH),
           title: String(msg.tab.title || '').slice(0, MAX_TITLE_LENGTH),
           favIconUrl: String(msg.tab.favIconUrl || '').slice(0, MAX_URL_LENGTH),
+          pinned: !!msg.tab.pinned,
+          groupTitle: msg.tab.groupTitle ? String(msg.tab.groupTitle).slice(0, MAX_TITLE_LENGTH) : '',
+          groupColor: msg.tab.groupColor ? String(msg.tab.groupColor).slice(0, 100) : '',
           senderBrowserId: clientId,
           senderBrowserName: store[clientId].browserName,
           sentAt: new Date().toISOString(),

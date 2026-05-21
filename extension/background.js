@@ -1,7 +1,10 @@
 // ─── SyncTabs Background Service Worker ───────────────────────────────────────
 // Works fully standalone (local tab persistence).
 // Optionally connects to local SyncTabs Companion server for cross-browser sync.
+// Optionally connects to a relay server for E2EE cross-network sync.
 // Store-compliant: no mandatory external dependencies.
+
+importScripts('e2ee.js');
 
 // ─── Default Settings ─────────────────────────────────────────────────────────
 const DEFAULTS = {
@@ -12,6 +15,11 @@ const DEFAULTS = {
   syncDebounceMs: 1000,
   serverAutoDetect: true,
   browserNameOverride: '',
+  // Relay settings
+  relayUrl: '',
+  relayEnabled: false,
+  relayRoomId: '',
+  relaySecretKey: '',
 };
 const LOOPBACK_HOST = '127.0.0.1';
 
@@ -28,6 +36,12 @@ let serverDetected = false;
 let reconnectTimer = null;
 let initDone = false;
 let initPromise = null;
+
+// ─── Relay State ──────────────────────────────────────────────────────────────
+let relayWs = null;
+let isRelayConnected = false;
+let relayCryptoKey = null;
+let relayReconnectTimer = null;
 
 // ─── Initialization Gate ──────────────────────────────────────────────────────
 // Every handler must await this before using browserId/browserName.
@@ -164,6 +178,7 @@ function isValidUrl(url) {
 async function collectTabs() {
   try {
     const tabs = await chrome.tabs.query({});
+    
     // Build a window incognito map for labeling
     const windowIncognito = {};
     const windowIds = [...new Set(tabs.map(t => t.windowId))];
@@ -173,17 +188,43 @@ async function collectTabs() {
         windowIncognito[wid] = win.incognito;
       } catch { windowIncognito[wid] = false; }
     }
-    return tabs.map(t => ({
-      id: t.id,
-      url: t.url || t.pendingUrl || '',
-      title: t.title || 'New Tab',
-      favIconUrl: t.favIconUrl || '',
-      pinned: t.pinned,
-      windowId: t.windowId,
-      active: t.active,
-      lastAccessed: t.lastAccessed || Date.now(),
-      incognito: windowIncognito[t.windowId] || false,
-    }));
+
+    // Build tab groups lookup
+    let groupsLookup = {};
+    if (typeof chrome.tabGroups !== 'undefined') {
+      try {
+        const groups = await chrome.tabGroups.query({});
+        for (const g of groups) {
+          groupsLookup[g.id] = {
+            title: g.title || '',
+            color: g.color || '',
+            collapsed: g.collapsed || false,
+          };
+        }
+      } catch (err) {
+        console.warn('[SyncTabs] Failed to query tab groups:', err);
+      }
+    }
+
+    return tabs.map(t => {
+      const hasGroup = t.groupId !== undefined && t.groupId !== -1 && groupsLookup[t.groupId];
+      return {
+        id: t.id,
+        url: t.url || t.pendingUrl || '',
+        title: t.title || 'New Tab',
+        favIconUrl: t.favIconUrl || '',
+        pinned: t.pinned,
+        windowId: t.windowId,
+        active: t.active,
+        lastAccessed: t.lastAccessed || Date.now(),
+        incognito: windowIncognito[t.windowId] || false,
+        groupId: t.groupId !== undefined ? t.groupId : -1,
+        groupTitle: hasGroup ? groupsLookup[t.groupId].title : '',
+        groupColor: hasGroup ? groupsLookup[t.groupId].color : '',
+        index: t.index,
+        discarded: !!t.discarded,
+      };
+    });
   } catch (err) {
     console.error('[SyncTabs] Failed to collect tabs:', err);
     return [];
@@ -200,6 +241,7 @@ async function saveTabsLocally(tabs) {
 
 async function saveRemoteBrowsers(browsers) {
   await chrome.storage.local.set({ synctabs_remote_browsers: browsers });
+  rebuildContextMenus();
 }
 
 async function getRemoteBrowsers() {
@@ -229,13 +271,160 @@ function filterSelfFromRemote(browsers) {
   return filtered;
 }
 
+// ─── Dynamic Context Menus ───────────────────────────────────────────────────
+async function rebuildContextMenus() {
+  await waitForInit();
+  
+  if (typeof chrome.contextMenus === 'undefined') return;
+
+  chrome.contextMenus.removeAll(async () => {
+    const remoteBrowsers = filterSelfFromRemote(await getRemoteBrowsers());
+    const validEntries = Object.entries(remoteBrowsers).filter(([id, d]) => {
+      if (!id || id === 'null' || id === 'undefined') return false;
+      if (id === browserId) return false;
+      return d && d.browserName;
+    });
+
+    if (validEntries.length === 0) return;
+
+    chrome.contextMenus.create({
+      id: 'synctabs-parent',
+      title: 'Send to SyncTabs',
+      contexts: ['page', 'link']
+    });
+
+    for (const [id, data] of validEntries) {
+      const isOnline = data.online;
+      const viaRelaySuffix = (!isConnected && isRelayConnected) ? ' (via relay)' : '';
+      const statusIndicator = isOnline ? '🟢' : '⚫';
+      chrome.contextMenus.create({
+        id: `synctabs-send::${id}`,
+        parentId: 'synctabs-parent',
+        title: `${statusIndicator} ${data.browserName}${viaRelaySuffix}`,
+        contexts: ['page', 'link']
+      });
+    }
+  });
+}
+
+// ─── Tab Group Restoration Helper ──────────────────────────────────────────────
+async function restoreTab(tab) {
+  if (!tab.url || !isValidUrl(tab.url)) return null;
+
+  // Create tab with active: false, pinned status
+  const createOpts = {
+    url: tab.url,
+    pinned: !!tab.pinned,
+    active: false
+  };
+
+  const createdTab = await chrome.tabs.create(createOpts);
+
+  // Tab groups preservation
+  if (tab.groupTitle && typeof chrome.tabGroups !== 'undefined') {
+    try {
+      const windowId = createdTab.windowId;
+      const existingGroups = await chrome.tabGroups.query({ windowId });
+      // Clean and normalize color just in case
+      const targetColor = (tab.groupColor || 'grey').toLowerCase();
+      const validColors = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'];
+      const finalColor = validColors.includes(targetColor) ? targetColor : 'grey';
+
+      const matchingGroup = existingGroups.find(g => g.title === tab.groupTitle);
+
+      if (matchingGroup) {
+        await chrome.tabs.group({ tabIds: [createdTab.id], groupId: matchingGroup.id });
+      } else {
+        const gid = await chrome.tabs.group({ tabIds: [createdTab.id] });
+        await chrome.tabGroups.update(gid, {
+          title: tab.groupTitle,
+          color: finalColor,
+        });
+      }
+    } catch (err) {
+      console.warn('[SyncTabs] Failed to restore tab group:', err);
+    }
+  }
+  return createdTab;
+}
+
+// ─── Send Tab Helper ──────────────────────────────────────────────────────────
+async function sendTabToBrowser(targetBrowserId, tab) {
+  await waitForInit();
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'send-tab',
+      targetBrowserId,
+      tab,
+    }));
+    return { ok: true };
+  } else if (relayWs && relayWs.readyState === WebSocket.OPEN && relayCryptoKey) {
+    try {
+      const payload = JSON.stringify({
+        type: 'send-tab',
+        targetBrowserId,
+        senderBrowserName: browserName,
+        url: tab.url,
+        title: tab.title,
+        pinned: !!tab.pinned,
+        groupTitle: tab.groupTitle || '',
+        groupColor: tab.groupColor || '',
+      });
+      const { iv, ciphertext } = await self.SyncTabsE2EE.encrypt(relayCryptoKey, payload);
+      relayWs.send(JSON.stringify({
+        type: 'relay-data',
+        roomId: settings.relayRoomId,
+        iv,
+        ciphertext,
+      }));
+      return { ok: true };
+    } catch (err) {
+      console.error('[SyncTabs Relay] Failed to send tab over relay:', err);
+      return { ok: false, error: 'Failed to encrypt/send over relay' };
+    }
+  } else {
+    return { ok: false, error: 'Not connected to server or relay' };
+  }
+}
+
 // ─── Snapshots (persist on last window close) ─────────────────────────────────
 async function saveSnapshot() {
   const tabs = await collectTabs();
+  const now = new Date();
+  const dateKey = now.toISOString().split('T')[0]; // e.g. "2026-05-20"
+  const snapshotId = `synctabs_snapshot_${dateKey}`;
+
+  // Save current snapshot (overwrites today's)
   await chrome.storage.local.set({
+    [snapshotId]: {
+      tabs,
+      time: now.toISOString(),
+      tabCount: tabs.length,
+    },
+    // Also keep the legacy key for backwards compatibility
     synctabs_snapshot: tabs,
-    synctabs_snapshot_time: new Date().toISOString(),
+    synctabs_snapshot_time: now.toISOString(),
   });
+
+  // Cleanup old snapshots (keep last 7 days)
+  try {
+    const allKeys = await chrome.storage.local.get(null);
+    const snapshotKeys = Object.keys(allKeys).filter(k => k.startsWith('synctabs_snapshot_'));
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 7);
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+    const toDelete = snapshotKeys.filter(k => {
+      const dateStr = k.replace('synctabs_snapshot_', '');
+      return dateStr < cutoffStr;
+    });
+
+    if (toDelete.length > 0) {
+      await chrome.storage.local.remove(toDelete);
+    }
+  } catch (err) {
+    console.warn('[SyncTabs] Snapshot cleanup error:', err);
+  }
 }
 
 async function getSnapshot() {
@@ -300,6 +489,7 @@ async function connectWebSocket() {
     if (socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ type: 'tabs-update', tabs }));
     notifyPopup({ type: 'connection-status', connected: true, serverDetected: true, browserName });
+    rebuildContextMenus();
   };
 
   ws.onmessage = async (event) => {
@@ -307,6 +497,36 @@ async function connectWebSocket() {
     try { msg = JSON.parse(event.data); } catch { return; }
 
     switch (msg.type) {
+      case 'global-sync-settings': {
+        const remoteSettings = msg.settings || {};
+        const changes = {};
+        let changed = false;
+
+        for (const key of ['relayEnabled', 'relayUrl', 'relayRoomId', 'relaySecretKey']) {
+          if (remoteSettings[key] !== undefined && remoteSettings[key] !== settings[key]) {
+            changes[key] = remoteSettings[key];
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          console.log('[SyncTabs] Received global sync settings from companion:', changes);
+          const oldEnabled = settings.relayEnabled;
+          await saveSettings(changes);
+
+          if (settings.relayEnabled && settings.relayUrl && settings.relayRoomId && settings.relaySecretKey) {
+            if (!oldEnabled || !isRelayConnected) {
+              disconnectRelay();
+              connectRelay();
+            }
+          } else if (!settings.relayEnabled) {
+            disconnectRelay();
+          }
+
+          notifyPopup({ type: 'settings-synced' });
+        }
+        break;
+      }
       case 'full-state': {
         // REPLACE local cache entirely — server is source of truth.
         // Filter out any entry that matches our own browserId (safety).
@@ -351,7 +571,7 @@ async function connectWebSocket() {
         let opened = 0;
         for (const pt of tabs) {
           if (pt.url && isValidUrl(pt.url)) {
-            chrome.tabs.create({ url: pt.url, active: false });
+            restoreTab(pt);
             opened++;
           }
         }
@@ -373,6 +593,7 @@ async function connectWebSocket() {
     isConnected = false;
     ws = null;
     notifyPopup({ type: 'connection-status', connected: false, serverDetected, browserName });
+    rebuildContextMenus();
     scheduleReconnect();
   };
 
@@ -389,6 +610,151 @@ function scheduleReconnect() {
   }, settings.reconnectMs);
 }
 
+// ─── Relay WebSocket Connection ───────────────────────────────────────────────
+async function connectRelay() {
+  await waitForInit();
+
+  if (!settings.relayEnabled || !settings.relayUrl || !settings.relayRoomId || !settings.relaySecretKey) {
+    return;
+  }
+
+  // Already connected
+  if (relayWs && relayWs.readyState === WebSocket.OPEN) return;
+
+  // Close stale CONNECTING socket
+  if (relayWs && relayWs.readyState === WebSocket.CONNECTING) {
+    try { relayWs.close(); } catch {}
+    relayWs = null;
+  }
+
+  // Import the secret key
+  try {
+    relayCryptoKey = await self.SyncTabsE2EE.importKey(settings.relaySecretKey);
+  } catch (err) {
+    console.error('[SyncTabs Relay] Failed to import secret key:', err);
+    return;
+  }
+
+  try { relayWs = new WebSocket(settings.relayUrl); }
+  catch (err) {
+    console.warn('[SyncTabs Relay] WS creation failed:', err.message);
+    scheduleRelayReconnect();
+    return;
+  }
+
+  relayWs.onopen = () => {
+    console.log('[SyncTabs Relay] Connected to relay server');
+    isRelayConnected = true;
+    relayWs.send(JSON.stringify({ type: 'join', roomId: settings.relayRoomId }));
+    notifyPopup({ type: 'relay-connection-status', connected: true });
+    rebuildContextMenus();
+    // Send current tabs immediately
+    sendTabsToRelay();
+  };
+
+  relayWs.onmessage = async (event) => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch { return; }
+
+    if (msg.type === 'relay-data') {
+      await handleRelayData(msg);
+    }
+  };
+
+  relayWs.onclose = () => {
+    console.log('[SyncTabs Relay] Disconnected');
+    isRelayConnected = false;
+    relayWs = null;
+    notifyPopup({ type: 'relay-connection-status', connected: false });
+    rebuildContextMenus();
+    scheduleRelayReconnect();
+  };
+
+  relayWs.onerror = () => {
+    console.warn('[SyncTabs Relay] WS error');
+  };
+}
+
+function scheduleRelayReconnect() {
+  if (relayReconnectTimer) clearTimeout(relayReconnectTimer);
+  relayReconnectTimer = setTimeout(async () => {
+    if (!isRelayConnected && settings.relayEnabled && settings.relayUrl) {
+      connectRelay();
+    }
+  }, settings.reconnectMs);
+}
+
+function disconnectRelay() {
+  if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
+  if (relayWs) {
+    try { relayWs.close(); } catch {}
+    relayWs = null;
+  }
+  isRelayConnected = false;
+  relayCryptoKey = null;
+}
+
+/** Encrypt and send current tabs to the relay server. */
+async function sendTabsToRelay() {
+  if (!relayWs || relayWs.readyState !== WebSocket.OPEN || !relayCryptoKey) return;
+  try {
+    const tabs = await collectTabs();
+    const payload = JSON.stringify({
+      browserId,
+      browserName,
+      tabs,
+      lastSeen: new Date().toISOString(),
+      online: true,
+    });
+    const { iv, ciphertext } = await self.SyncTabsE2EE.encrypt(relayCryptoKey, payload);
+    relayWs.send(JSON.stringify({
+      type: 'relay-data',
+      roomId: settings.relayRoomId,
+      iv,
+      ciphertext,
+    }));
+  } catch (err) {
+    console.error('[SyncTabs Relay] Failed to send tabs:', err);
+  }
+}
+
+/** Handle an incoming relay-data message: decrypt, parse, merge. */
+async function handleRelayData(msg) {
+  if (!relayCryptoKey) return;
+  try {
+    const plaintext = await self.SyncTabsE2EE.decrypt(relayCryptoKey, msg.iv, msg.ciphertext);
+    const data = JSON.parse(plaintext);
+
+    // If it's a send-tab command, open the tab locally
+    if (data.type === 'send-tab') {
+      if (data.targetBrowserId && data.targetBrowserId !== browserId) {
+        return;
+      }
+      if (data.url && isValidUrl(data.url)) {
+        restoreTab(data);
+        const sender = data.senderBrowserName || 'Remote browser';
+        notifyPopup({ type: 'tabs-received', count: 1, senderName: sender });
+      }
+      return;
+    }
+
+    // Otherwise treat as remote browser tab data
+    if (data.browserId && data.browserId !== browserId) {
+      const remote = filterSelfFromRemote(await getRemoteBrowsers());
+      remote[data.browserId] = {
+        browserName: data.browserName || 'Remote Browser',
+        tabs: data.tabs || [],
+        lastSeen: data.lastSeen || new Date().toISOString(),
+        online: data.online !== undefined ? data.online : true,
+      };
+      await saveRemoteBrowsers(remote);
+      notifyPopup({ type: 'state-updated', browsers: remote });
+    }
+  } catch (err) {
+    console.error('[SyncTabs Relay] Failed to decrypt/process relay data:', err);
+  }
+}
+
 // ─── Tab Change Monitoring ────────────────────────────────────────────────────
 function debouncedTabSync() {
   if (tabSyncTimeout) clearTimeout(tabSyncTimeout);
@@ -396,8 +762,13 @@ function debouncedTabSync() {
     await waitForInit();
     const tabs = await collectTabs();
     await saveTabsLocally(tabs);
+    // Local companion sync
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'tabs-update', tabs }));
+    }
+    // Relay sync (encrypted)
+    if (isRelayConnected) {
+      sendTabsToRelay();
     }
   }, settings.syncDebounceMs);
 }
@@ -413,6 +784,27 @@ chrome.tabs.onDetached.addListener(debouncedTabSync);
 chrome.tabs.onReplaced.addListener(debouncedTabSync);
 chrome.windows.onCreated.addListener(debouncedTabSync);
 chrome.windows.onRemoved.addListener(async () => { await saveSnapshot(); debouncedTabSync(); });
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId.startsWith('synctabs-send::')) {
+    const targetBrowserId = info.menuItemId.substring('synctabs-send::'.length);
+    const sendUrl = info.linkUrl || info.pageUrl || tab?.url;
+    if (!sendUrl || !isValidUrl(sendUrl)) {
+      console.warn('[SyncTabs] ContextMenu send aborted: invalid URL', sendUrl);
+      return;
+    }
+
+    const sendTitle = tab && (sendUrl === tab.url) ? tab.title : (info.selectionText || 'Shared Link');
+    const tabPayload = {
+      url: sendUrl,
+      title: sendTitle,
+      favIconUrl: tab && (sendUrl === tab.url) ? tab.favIconUrl : null,
+    };
+
+    console.log(`[SyncTabs] Sending tab via ContextMenu to ${targetBrowserId}:`, tabPayload);
+    await sendTabToBrowser(targetBrowserId, tabPayload);
+  }
+});
 
 // ─── Popup / Options Communication ────────────────────────────────────────────
 function notifyPopup(message) {
@@ -442,6 +834,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           remoteBrowsers: filtered,
           snapshot,
           settings,
+          // Relay status
+          isRelayConnected,
+          relayEnabled: settings.relayEnabled,
         });
       })();
       return true;
@@ -551,17 +946,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     }
     case 'send-tab': {
       (async () => {
-        await waitForInit();
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: 'send-tab',
-            targetBrowserId: msg.targetBrowserId,
-            tab: msg.tab,
-          }));
-          sendResponse({ ok: true });
-        } else {
-          sendResponse({ ok: false, error: 'Not connected to server' });
-        }
+        const res = await sendTabToBrowser(msg.targetBrowserId, msg.tab);
+        sendResponse(res);
       })();
       return true;
     }
@@ -629,6 +1015,303 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       })();
       return true;
     }
+
+    case 'open-all-tabs': {
+      (async () => {
+        await waitForInit();
+        try {
+          const tabs = msg.tabs || [];
+          if (tabs.length === 0) {
+            sendResponse({ ok: false, error: 'No tabs to open' });
+            return;
+          }
+
+          // Create a new window with the first tab
+          const firstTab = tabs[0];
+          const newWindow = await chrome.windows.create({
+            url: firstTab.url,
+            focused: true,
+          });
+
+          const createdTabIds = [];
+          // The window.create already created one tab, get its ID
+          const firstCreatedTab = newWindow.tabs[0];
+
+          // Handle pinned status for first tab
+          if (firstTab.pinned) {
+            await chrome.tabs.update(firstCreatedTab.id, { pinned: true });
+          }
+
+          // Create remaining tabs
+          for (let i = 1; i < tabs.length; i++) {
+            const t = tabs[i];
+            if (!t.url || !isValidUrl(t.url)) continue;
+            const createOpts = {
+              url: t.url,
+              windowId: newWindow.id,
+              active: false,
+            };
+            if (t.pinned) createOpts.pinned = true;
+            try {
+              const created = await chrome.tabs.create(createOpts);
+              createdTabIds.push(created.id);
+            } catch {}
+          }
+
+          // Discard all tabs except the first (lazy loading)
+          for (const tabId of createdTabIds) {
+            try {
+              await chrome.tabs.discard(tabId);
+            } catch {}
+          }
+
+          // Handle tab groups if available
+          if (chrome.tabGroups) {
+            const groupMap = {};
+            const allTabs = await chrome.tabs.query({ windowId: newWindow.id });
+            for (let i = 0; i < tabs.length && i < allTabs.length; i++) {
+              const srcTab = tabs[i];
+              const destTab = allTabs[i];
+              if (srcTab.groupTitle) {
+                try {
+                  if (!groupMap[srcTab.groupTitle]) {
+                    const gid = await chrome.tabs.group({ tabIds: [destTab.id] });
+                    await chrome.tabGroups.update(gid, {
+                      title: srcTab.groupTitle,
+                      color: srcTab.groupColor || 'grey',
+                    });
+                    groupMap[srcTab.groupTitle] = gid;
+                  } else {
+                    await chrome.tabs.group({ tabIds: [destTab.id], groupId: groupMap[srcTab.groupTitle] });
+                  }
+                } catch {}
+              }
+            }
+          }
+
+          sendResponse({ ok: true, count: tabs.length });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+    }
+    case 'open-tab-discarded': {
+      (async () => {
+        try {
+          const tab = msg.tab;
+          if (!tab || !tab.url || !isValidUrl(tab.url)) {
+            sendResponse({ ok: false, error: 'Invalid tab URL' });
+            return;
+          }
+          const created = await chrome.tabs.create({
+            url: tab.url,
+            active: false,
+            pinned: !!tab.pinned,
+          });
+
+          // Discard the tab to lazy load it
+          try {
+            await chrome.tabs.discard(created.id);
+          } catch {}
+
+          // Handle tab group if available
+          if (tab.groupTitle && typeof chrome.tabGroups !== 'undefined') {
+            try {
+              const windowId = created.windowId;
+              const existingGroups = await chrome.tabGroups.query({ windowId });
+              const targetColor = (tab.groupColor || 'grey').toLowerCase();
+              const validColors = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'];
+              const finalColor = validColors.includes(targetColor) ? targetColor : 'grey';
+
+              const matchingGroup = existingGroups.find(g => g.title === tab.groupTitle);
+              if (matchingGroup) {
+                await chrome.tabs.group({ tabIds: [created.id], groupId: matchingGroup.id });
+              } else {
+                const gid = await chrome.tabs.group({ tabIds: [created.id] });
+                await chrome.tabGroups.update(gid, {
+                  title: tab.groupTitle,
+                  color: finalColor,
+                });
+              }
+            } catch {}
+          }
+
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+    }
+    case 'get-snapshot-history': {
+      (async () => {
+        try {
+          const allData = await chrome.storage.local.get(null);
+          const snapshots = [];
+          for (const [key, value] of Object.entries(allData)) {
+            if (key.startsWith('synctabs_snapshot_') && value && value.tabs) {
+              snapshots.push({
+                id: key,
+                date: key.replace('synctabs_snapshot_', ''),
+                time: value.time,
+                tabCount: value.tabCount || value.tabs.length,
+              });
+            }
+          }
+          // Sort by date descending (newest first)
+          snapshots.sort((a, b) => b.date.localeCompare(a.date));
+          sendResponse({ ok: true, snapshots });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+    }
+    case 'restore-snapshot': {
+      (async () => {
+        try {
+          const data = await chrome.storage.local.get(msg.snapshotId);
+          const snapshot = data[msg.snapshotId];
+          if (!snapshot || !snapshot.tabs || snapshot.tabs.length === 0) {
+            sendResponse({ ok: false, error: 'Snapshot not found or empty' });
+            return;
+          }
+
+          // Use the open-all-tabs logic: create window with first tab, then create rest discarded
+          const tabs = snapshot.tabs.filter(t => t.url && isValidUrl(t.url));
+          if (tabs.length === 0) {
+            sendResponse({ ok: false, error: 'No valid tabs in snapshot' });
+            return;
+          }
+
+          const newWindow = await chrome.windows.create({ url: tabs[0].url, focused: true });
+          const createdIds = [];
+          if (tabs[0].pinned) {
+            try { await chrome.tabs.update(newWindow.tabs[0].id, { pinned: true }); } catch {}
+          }
+
+          for (let i = 1; i < tabs.length; i++) {
+            try {
+              const created = await chrome.tabs.create({
+                url: tabs[i].url,
+                windowId: newWindow.id,
+                active: false,
+                pinned: tabs[i].pinned || false,
+              });
+              createdIds.push(created.id);
+            } catch {}
+          }
+
+          // Discard non-active tabs
+          for (const id of createdIds) {
+            try { await chrome.tabs.discard(id); } catch {}
+          }
+
+          sendResponse({ ok: true, count: tabs.length });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+    }
+    case 'delete-snapshot': {
+      (async () => {
+        try {
+          await chrome.storage.local.remove(msg.snapshotId);
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+    }
+    case 'create-snapshot': {
+      (async () => {
+        try {
+          await saveSnapshot();
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+    }
+
+    // ─── Relay Message Handlers ──────────────────────────────────────────────
+    case 'get-relay-settings': {
+      (async () => {
+        await waitForInit();
+        sendResponse({
+          relayEnabled: settings.relayEnabled,
+          relayUrl: settings.relayUrl,
+          relayRoomId: settings.relayRoomId,
+          relaySecretKey: settings.relaySecretKey,
+          isRelayConnected,
+        });
+      })();
+      return true;
+    }
+    case 'update-relay-settings': {
+      (async () => {
+        await waitForInit();
+        const oldEnabled = settings.relayEnabled;
+        await saveSettings(msg.settings);
+
+        // Sync settings to Go companion if connected
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'update-global-sync-settings',
+            settings: msg.settings
+          }));
+        }
+
+        if (settings.relayEnabled && settings.relayUrl && settings.relayRoomId && settings.relaySecretKey) {
+          // Disconnect and reconnect if settings changed or newly enabled
+          if (!oldEnabled || !isRelayConnected) {
+            disconnectRelay();
+            connectRelay();
+          }
+        } else if (!settings.relayEnabled) {
+          disconnectRelay();
+        }
+        sendResponse({ ok: true, settings });
+      })();
+      return true;
+    }
+    case 'generate-relay-pairing': {
+      (async () => {
+        await waitForInit();
+        try {
+          const cryptoKey = await self.SyncTabsE2EE.generateKey();
+          const secretKey = await self.SyncTabsE2EE.exportKey(cryptoKey);
+          const roomId = self.SyncTabsE2EE.generateRoomId();
+          const updates = {
+            relayRoomId: roomId,
+            relaySecretKey: secretKey,
+          };
+          await saveSettings(updates);
+
+          // Sync generated credentials to Go companion if connected
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'update-global-sync-settings',
+              settings: updates
+            }));
+          }
+
+          sendResponse({
+            ok: true,
+            relayUrl: settings.relayUrl,
+            roomId,
+            secretKey,
+          });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+    }
   }
 });
 
@@ -667,6 +1350,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 // ─── Startup ──────────────────────────────────────────────────────────────────
 (async () => {
   await waitForInit();
+  rebuildContextMenus();
   debouncedTabSync();
 
   if (settings.serverEnabled) {
@@ -677,5 +1361,11 @@ chrome.runtime.onInstalled.addListener((details) => {
     } else {
       console.log('[SyncTabs] No local server — local-only mode');
     }
+  }
+
+  // Start relay connection if enabled and configured
+  if (settings.relayEnabled && settings.relayUrl && settings.relayRoomId && settings.relaySecretKey) {
+    console.log('[SyncTabs] Relay enabled — connecting to relay server');
+    connectRelay();
   }
 })();

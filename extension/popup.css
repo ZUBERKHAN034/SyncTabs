@@ -241,6 +241,34 @@ body {
   display: none;
 }
 
+/* ─── Open All Button ────────────────────────────────────────────────────── */
+.open-all-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  margin-right: 6px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.open-all-btn:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+  background: var(--bg-hover);
+}
+
+.open-all-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 /* ─── Tab List ───────────────────────────────────────────────────────────── */
 .tab-list {
   border-top: 1px solid var(--border);
@@ -638,3 +666,85 @@ body {
 .window-label-private {
   font-style: italic;
 }
+
+/* ─── Search Bar ────────────────────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  margin: 8px 10px;
+  padding: 6px 12px;
+  background: var(--bg-tab);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  gap: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.search-bar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.search-icon {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+#search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+#search-input::placeholder {
+  color: var(--text-dim);
+}
+
+.search-clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border-radius: 50%;
+  transition: all 0.15s;
+}
+
+.search-clear-btn:hover {
+  color: var(--text-bright);
+  background: var(--bg-hover);
+}
+
+/* Highlight Matching Text */
+mark {
+  background: rgba(122, 162, 247, 0.3);
+  color: var(--text-bright);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ─── Discarded / Suspended Tabs ────────────────────────────────────────── */
+.tab-discarded {
+  opacity: 0.65;
+  transition: opacity 0.15s;
+}
+
+.tab-discarded:hover {
+  opacity: 0.95;
+}
+
+.tab-discarded-icon {
+  font-size: 10px;
+  flex-shrink: 0;
+  color: var(--accent);
+  margin-left: 2px;
+}
+

@@ -32,7 +32,7 @@ func Run(s ServerInterface) {
 }
 
 func onReady() {
-	systray.SetIcon(iconConnected)
+	setTrayIcon(iconConnected)
 	systray.SetTitle("SyncTabs Companion")
 	systray.SetTooltip("SyncTabs Companion — Starting...")
 
@@ -131,11 +131,11 @@ func UpdateStatus() {
 	var statusText string
 	if count == 0 {
 		statusText = "● Running — no browsers connected"
-		systray.SetIcon(iconDisconnected)
+		setTrayIcon(iconDisconnected)
 		systray.SetTooltip("SyncTabs Companion — No browsers connected")
 	} else if count == 1 && len(names) > 0 {
 		statusText = fmt.Sprintf("● Connected — %s", names[0])
-		systray.SetIcon(iconConnected)
+		setTrayIcon(iconConnected)
 		systray.SetTooltip(fmt.Sprintf("SyncTabs — %s connected", names[0]))
 	} else {
 		browserList := ""
@@ -146,7 +146,7 @@ func UpdateStatus() {
 			browserList += n
 		}
 		statusText = fmt.Sprintf("● Connected — %d browsers", count)
-		systray.SetIcon(iconConnected)
+		setTrayIcon(iconConnected)
 		systray.SetTooltip(fmt.Sprintf("SyncTabs — %s", browserList))
 	}
 	mStatus.SetTitle(statusText)

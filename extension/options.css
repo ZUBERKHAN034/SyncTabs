@@ -349,3 +349,137 @@ select:focus {
 #btn-grant-permission {
   display: none;
 }
+
+/* ─── E2EE Relay Sync ───────────────────────────────────────────────────── */
+.relay-qr-area {
+  margin-top: 14px;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.relay-qr-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.relay-qr-area canvas {
+  display: block;
+  margin: 0 auto;
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.relay-qr-payload {
+  margin-top: 10px;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: 'Consolas', 'Courier New', monospace;
+  word-break: break-all;
+  max-height: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#relay-status-row {
+  margin-top: 12px;
+}
+
+#section-relay .toggle-row {
+  margin-bottom: 4px;
+}
+
+/* ─── Session Snapshots ─────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.card h2 {
+  font-size: 14px;
+  color: var(--text-bright);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.snapshot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.snapshot-list .text-muted {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.snapshot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.snapshot-item:hover {
+  border-color: var(--accent-dim);
+  background: var(--bg-hover);
+}
+
+.snapshot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.snapshot-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.snapshot-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.snapshot-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: 12px;
+}
+
+.snapshot-actions .btn {
+  padding: 6px 12px;
+  font-size: 11.5px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+

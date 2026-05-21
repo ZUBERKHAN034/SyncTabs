@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 
+	"fyne.io/systray"
 	"github.com/harshvasudeva/synctabs-companion/logger"
 )
 
@@ -44,4 +45,9 @@ func getAutoStartLabel() string {
 		return "Start with desktop session"
 	}
 	return "Start on login"
+}
+
+// setTrayIcon sets a standard icon on Linux
+func setTrayIcon(iconBytes []byte) {
+	systray.SetIcon(iconBytes)
 }

@@ -13,15 +13,20 @@ import (
 
 // Tab mirrors the validated tab shape from server.js
 type Tab struct {
-	ID           int    `json:"id"`
-	URL          string `json:"url"`
-	Title        string `json:"title"`
-	FavIconURL   string `json:"favIconUrl"`
-	Pinned       bool   `json:"pinned"`
-	WindowID     int    `json:"windowId"`
-	Active       bool   `json:"active"`
+	ID           int     `json:"id"`
+	URL          string  `json:"url"`
+	Title        string  `json:"title"`
+	FavIconURL   string  `json:"favIconUrl"`
+	Pinned       bool    `json:"pinned"`
+	WindowID     int     `json:"windowId"`
+	Active       bool    `json:"active"`
 	LastAccessed float64 `json:"lastAccessed"`
-	Incognito    bool   `json:"incognito"`
+	Incognito    bool    `json:"incognito"`
+	Index        int     `json:"index"`
+	GroupID      int     `json:"groupId,omitempty"`
+	GroupTitle   string  `json:"groupTitle,omitempty"`
+	GroupColor   string  `json:"groupColor,omitempty"`
+	Discarded    bool    `json:"discarded"`
 }
 
 // BrowserData is the per-browser entry in tabs.json

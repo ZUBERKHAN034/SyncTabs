@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"fyne.io/systray"
 	"github.com/harshvasudeva/synctabs-companion/logger"
 )
 
@@ -43,4 +44,9 @@ func showNotification(title, message string) {
 // getAutoStartLabel returns the platform-specific auto-start menu label
 func getAutoStartLabel() string {
 	return "Start with macOS"
+}
+
+// setTrayIcon sets a template icon on macOS so it automatically inverts based on light/dark mode and looks extremely crisp.
+func setTrayIcon(iconBytes []byte) {
+	systray.SetTemplateIcon(iconBytes, iconBytes)
 }

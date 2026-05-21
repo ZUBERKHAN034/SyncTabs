@@ -134,6 +134,7 @@ type inboundMsg struct {
 	Tabs            json.RawMessage `json:"tabs"`
 	TargetBrowserID string          `json:"targetBrowserId"`
 	Tab             json.RawMessage `json:"tab"`
+	Settings        json.RawMessage `json:"settings"`
 }
 
 // HandleConnection is called once per new WebSocket upgrade.
@@ -191,6 +192,8 @@ func HandleConnection(
 			handleRequestState(conn, state)
 		case "send-tab":
 			handleSendTab(conn, msg, state, pending, reg)
+		case "update-global-sync-settings":
+			handleUpdateGlobalSyncSettings(conn, msg, state, reg)
 		}
 	}
 }
@@ -249,6 +252,18 @@ func handleRegister(
 		})
 		logger.Info("[Deliver] %d pending tab(s) → %s", len(tabs), msg.BrowserName)
 	}
+
+	// Send current global E2EE remote sync settings to the newly registered client
+	compCfg := config.Get()
+	_ = conn.sendJSON(map[string]interface{}{
+		"type": "global-sync-settings",
+		"settings": map[string]interface{}{
+			"relayEnabled":   compCfg.RelayEnabled,
+			"relayUrl":       compCfg.RelayURL,
+			"relayRoomId":    compCfg.RelayRoomID,
+			"relaySecretKey": compCfg.RelaySecretKey,
+		},
+	})
 }
 
 func handleTabsUpdate(
@@ -321,6 +336,9 @@ func handleSendTab(
 		URL        string `json:"url"`
 		Title      string `json:"title"`
 		FavIconURL string `json:"favIconUrl"`
+		Pinned     bool   `json:"pinned"`
+		GroupTitle string `json:"groupTitle"`
+		GroupColor string `json:"groupColor"`
 	}
 	if err := json.Unmarshal(msg.Tab, &tab); err != nil || tab.URL == "" {
 		_ = conn.sendJSON(map[string]string{"type": "error", "message": "Invalid send-tab payload"})
@@ -336,6 +354,9 @@ func handleSendTab(
 		URL:               truncate(tab.URL, 2048),
 		Title:             truncate(tab.Title, 500),
 		FavIconURL:        truncate(tab.FavIconURL, 2048),
+		Pinned:            tab.Pinned,
+		GroupTitle:        truncate(tab.GroupTitle, 500),
+		GroupColor:        truncate(tab.GroupColor, 100),
 		SenderBrowserID:   conn.browserId,
 		SenderBrowserName: senderData.BrowserName,
 		SentAt:            time.Now().Format(time.RFC3339),
@@ -405,4 +426,40 @@ func truncate(s string, maxLen int) string {
 		return s[:maxLen]
 	}
 	return s
+}
+
+func handleUpdateGlobalSyncSettings(
+	conn *clientConn,
+	msg inboundMsg,
+	state *StateStore,
+	reg *connectionRegistry,
+) {
+	if conn.browserId == "" {
+		return
+	}
+
+	var incomingSettings map[string]interface{}
+	if err := json.Unmarshal(msg.Settings, &incomingSettings); err != nil {
+		logger.Error("Failed to parse incoming global sync settings: %v", err)
+		return
+	}
+
+	logger.Info("[Global Sync Settings] Updating config with partial settings from %s", conn.browserId)
+
+	// config.Update takes a map and merges it
+	_, _, err := config.Update(incomingSettings)
+	if err != nil {
+		logger.Error("Failed to update config with global sync settings: %v", err)
+		return
+	}
+
+	if err := config.Save(); err != nil {
+		logger.Error("Failed to save updated config: %v", err)
+	}
+
+	// Broadcast to ALL OTHER connected browser extensions
+	reg.broadcast(conn.browserId, map[string]interface{}{
+		"type":     "global-sync-settings",
+		"settings": incomingSettings,
+	})
 }

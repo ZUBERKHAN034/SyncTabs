@@ -26,6 +26,7 @@
           </svg>
         </button>
         <span id="connection-dot" class="dot dot-offline" title="Disconnected"></span>
+        <span id="relay-dot" class="dot dot-offline" title="Relay" style="display:none"></span>
         <button id="btn-sync" class="btn-icon" title="Force Sync">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 2v6h-6M3 22v-6h6"/>
@@ -34,6 +35,16 @@
         </button>
       </div>
     </header>
+
+    <!-- Search Bar -->
+    <div id="search-bar" class="search-bar">
+      <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="search-input" type="text" placeholder="Search all tabs…" autocomplete="off">
+      <button id="search-clear" class="search-clear-btn" style="display: none;">✕</button>
+    </div>
 
     <!-- Server Setup Banner (shown when server not detected) -->
     <div id="server-banner" class="server-banner" style="display:none">

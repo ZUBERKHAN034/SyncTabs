@@ -32,6 +32,7 @@ SyncTabsTheme.initFromStorage().catch(() => {});
 
 // ─── DOM Elements ─────────────────────────────────────────────────────────────
 const connectionDot = document.getElementById('connection-dot');
+const relayDot = document.getElementById('relay-dot');
 const btnSync = document.getElementById('btn-sync');
 const btnSettings = document.getElementById('btn-settings');
 const selfBrowserIcon = document.getElementById('self-browser-icon');
@@ -48,6 +49,8 @@ const btnEnableSync = document.getElementById('btn-enable-sync');
 const btnDismissBanner = document.getElementById('btn-dismiss-banner');
 const linkCompanion = document.getElementById('link-companion');
 const toastContainer = document.getElementById('toast-container');
+const searchInput = document.getElementById('search-input');
+const searchClear = document.getElementById('search-clear');
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let state = {
@@ -61,7 +64,12 @@ let state = {
   remoteBrowsers: {},
   snapshot: { tabs: [], time: null },
   settings: {},
+  relayEnabled: false,
+  isRelayConnected: false,
 };
+
+// Global search query
+let searchQuery = '';
 
 // Session-scoped set of hidden remote tabs (cosmetic removal)
 const hiddenRemoteTabs = new Set();
@@ -96,9 +104,17 @@ function showToast(message, type = 'success') {
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
   renderConnectionStatus();
+  renderRelayStatus();
   renderServerBanner();
-  renderSelfBrowser();
-  renderRemoteBrowsers();
+
+  if (searchQuery.trim().length > 0) {
+    renderSearchResults();
+  } else {
+    // Restore display of self section
+    document.getElementById('section-self').style.display = 'block';
+    renderSelfBrowser();
+    renderRemoteBrowsers();
+  }
 }
 
 function renderConnectionStatus() {
@@ -116,6 +132,20 @@ function renderConnectionStatus() {
     connectionDot.className = 'dot dot-offline';
     connectionDot.title = 'Local-only mode';
     setServerStatus('local', browserLabel);
+  }
+}
+
+function renderRelayStatus() {
+  if (state.relayEnabled && state.isRelayConnected) {
+    relayDot.style.display = 'inline-block';
+    relayDot.className = 'dot dot-online';
+    relayDot.title = 'Relay connected (E2EE)';
+  } else if (state.relayEnabled) {
+    relayDot.style.display = 'inline-block';
+    relayDot.className = 'dot dot-offline';
+    relayDot.title = 'Relay disconnected';
+  } else {
+    relayDot.style.display = 'none';
   }
 }
 
@@ -238,6 +268,34 @@ function renderRemoteBrowsers() {
     titleRow.appendChild(dotEl);
     titleRow.appendChild(lastSeenEl);
     header.appendChild(titleRow);
+
+    // Open All button
+    const openAllBtn = document.createElement('button');
+    openAllBtn.className = 'open-all-btn';
+    openAllBtn.title = 'Open all tabs in a new window (lazy-loaded)';
+    openAllBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`;
+    openAllBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      openAllBtn.disabled = true;
+      openAllBtn.innerHTML = '⏳';
+      try {
+        const result = await chrome.runtime.sendMessage({
+          type: 'open-all-tabs',
+          tabs: visibleTabs,
+        });
+        if (result && result.ok) {
+          showToast(`Opened ${result.count} tabs (lazy-loaded)`);
+        } else {
+          showToast(result?.error || 'Failed to open tabs', 'error');
+        }
+      } catch {
+        showToast('Failed to open tabs', 'error');
+      }
+      openAllBtn.disabled = false;
+      openAllBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`;
+    });
+    header.appendChild(openAllBtn);
+
     header.appendChild(chevronWrap.firstChild);
 
     const tabList = document.createElement('div');
@@ -269,6 +327,26 @@ function createTabElement(tab, isLocal) {
     item.href = tab.url;
     item.target = '_blank';
     item.rel = 'noopener';
+    item.addEventListener('click', async (e) => {
+      if (e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          const res = await chrome.runtime.sendMessage({
+            type: 'open-tab-discarded',
+            tab: tab
+          });
+          if (res && res.ok) {
+            showToast('Opened in background (suspended)');
+          } else {
+            showToast(res.error || 'Failed to open suspended tab', 'error');
+          }
+        } catch {
+          showToast('Failed to open suspended tab', 'error');
+        }
+      }
+    });
+    item.title = "Click to open\nShift+Click to open suspended (lazy-load)";
   }
 
   if (isLocal) {
@@ -322,6 +400,14 @@ function createTabElement(tab, isLocal) {
     dot.title = 'Active tab';
     item.appendChild(dot);
   }
+  if (tab.discarded) {
+    item.classList.add('tab-discarded');
+    const zzz = document.createElement('span');
+    zzz.className = 'tab-discarded-icon';
+    zzz.textContent = '💤';
+    zzz.title = 'Suspended to save memory';
+    item.appendChild(zzz);
+  }
 
   // ─── Action Buttons ───────────────────────────────────────────────────
   const actions = document.createElement('div');
@@ -341,7 +427,7 @@ function createTabElement(tab, isLocal) {
   }
 
   // Send to another browser (only for local tabs when server is connected and has remote browsers)
-  if (isLocal && state.connected && hasRemote && tab.url && !isInternal) {
+  if (isLocal && (state.connected || state.isRelayConnected) && hasRemote && tab.url && !isInternal) {
     actions.appendChild(createActionBtn('send', 'Send to another browser', SVG_SEND, (e) => handleSendTab(e, tab)));
   }
 
@@ -486,7 +572,11 @@ function handleSendTab(e, tab) {
     setBrowserIconElement(iconWrap, data.browserName);
 
     const label = document.createElement('span');
-    label.textContent = data.browserName;
+    if (!state.connected && state.isRelayConnected) {
+      label.textContent = `${data.browserName} (via relay)`;
+    } else {
+      label.textContent = data.browserName;
+    }
 
     const dot = document.createElement('span');
     dot.className = `dot ${dotClass}`;
@@ -778,6 +868,139 @@ chrome.runtime.onMessage.addListener((msg) => {
     if (msg.status === 'queued') {
       showToast('Tab queued (browser offline)');
     }
+  }
+  if (msg.type === 'relay-status') {
+    state.isRelayConnected = !!msg.connected;
+    state.relayEnabled = msg.relayEnabled !== undefined ? msg.relayEnabled : state.relayEnabled;
+    renderRelayStatus();
+  }
+});
+
+// ─── Global Search Rendering & Logic ──────────────────────────────────────────
+function renderSearchResults() {
+  // Hide self section
+  document.getElementById('section-self').style.display = 'none';
+  emptyState.style.display = 'none';
+  emptyNoServer.style.display = 'none';
+  emptyNoBrowsers.style.display = 'none';
+
+  remoteBrowsersEl.innerHTML = '';
+
+  const query = searchQuery.trim().toLowerCase();
+  const matchedTabs = [];
+
+  // Search in local tabs
+  const localName = state.browserName || 'This Browser';
+  for (const tab of state.myTabs) {
+    if (tab.title.toLowerCase().includes(query) || tab.url.toLowerCase().includes(query)) {
+      matchedTabs.push({ ...tab, deviceName: `${localName} (this)`, isLocal: true });
+    }
+  }
+
+  // Search in remote tabs
+  const browsers = state.remoteBrowsers || {};
+  for (const [id, data] of Object.entries(browsers)) {
+    if (!id || id === 'null' || id === state.browserId) continue;
+    const name = data.browserName || 'Remote Browser';
+    for (const tab of (data.tabs || [])) {
+      if (tab.title.toLowerCase().includes(query) || tab.url.toLowerCase().includes(query)) {
+        matchedTabs.push({ ...tab, deviceName: name, isLocal: false });
+      }
+    }
+  }
+
+  if (matchedTabs.length === 0) {
+    remoteBrowsersEl.innerHTML = `<div class="empty-state"><p>No tabs matching "${searchQuery}"</p></div>`;
+    return;
+  }
+
+  const section = document.createElement('section');
+  section.className = 'section';
+
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.style.cursor = 'default';
+
+  const titleRow = document.createElement('div');
+  titleRow.className = 'section-title';
+  titleRow.textContent = `Search Results (${matchedTabs.length} tabs matching "${searchQuery}")`;
+  header.appendChild(titleRow);
+
+  const tabList = document.createElement('div');
+  tabList.className = 'tab-list';
+
+  section.appendChild(header);
+  section.appendChild(tabList);
+
+  for (const tab of matchedTabs) {
+    const tabEl = createTabElement(tab, tab.isLocal);
+
+    // Add device inline label/badge to tab-info or tab-item
+    const info = tabEl.querySelector('.tab-info');
+    if (info) {
+      const deviceLabel = document.createElement('div');
+      deviceLabel.className = 'tab-device-badge';
+      deviceLabel.style.fontSize = '9px';
+      deviceLabel.style.color = 'var(--accent)';
+      deviceLabel.style.marginTop = '2px';
+      deviceLabel.textContent = `💻 ${tab.deviceName}`;
+      info.appendChild(deviceLabel);
+    }
+
+    // Also highlight matched query in title and url! Let's do highlight using <mark>
+    const titleEl = tabEl.querySelector('.tab-title');
+    if (titleEl && tab.title) {
+      titleEl.innerHTML = highlightMatch(tab.title, query);
+    }
+    const urlEl = tabEl.querySelector('.tab-url');
+    if (urlEl && tab.url) {
+      urlEl.innerHTML = highlightMatch(simplifyUrl(tab.url), query);
+    }
+
+    tabList.appendChild(tabEl);
+  }
+
+  remoteBrowsersEl.appendChild(section);
+}
+
+function highlightMatch(text, query) {
+  if (!query) return text;
+  const index = text.toLowerCase().indexOf(query);
+  if (index === -1) return text;
+  const originalMatch = text.slice(index, index + query.length);
+  return escapeHtml(text.slice(0, index)) + `<mark>${escapeHtml(originalMatch)}</mark>` + highlightMatch(text.slice(index + query.length), query);
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ─── Search Event Listeners ──────────────────────────────────────────────────
+searchInput.addEventListener('input', () => {
+  searchQuery = searchInput.value;
+  searchClear.style.display = searchQuery.length > 0 ? 'block' : 'none';
+  render();
+});
+
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  searchQuery = '';
+  searchClear.style.display = 'none';
+  searchInput.focus();
+  render();
+});
+
+// Shortcut Ctrl+F / Cmd+F to focus search
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault();
+    searchInput.focus();
+    searchInput.select();
   }
 });
 
