@@ -1,0 +1,128 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "SyncTabs",
+  "colors": {
+    "primary": "#2563EB",
+    "light": "#3B82F6",
+    "dark": "#1D4ED8"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "index",
+              "getting-started",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Extension",
+            "pages": [
+              "extension/installation",
+              "extension/local-mode",
+              "extension/sync-mode",
+              "extension/relay-mode",
+              "extension/settings",
+              "extension/e2ee"
+            ]
+          },
+          {
+            "group": "Companion",
+            "pages": [
+              "companion/installation",
+              "companion/configuration",
+              "companion/system-tray",
+              "companion/auto-start"
+            ]
+          },
+          {
+            "group": "Relay server",
+            "pages": [
+              "relay/deployment",
+              "relay/configuration",
+              "relay/mobile-portal"
+            ]
+          },
+          {
+            "group": "Other platforms",
+            "pages": [
+              "safari"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          {
+            "group": "Protocol",
+            "pages": [
+              "api/websocket-protocol",
+              "api/http-api",
+              "api/message-types"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Reference",
+            "pages": [
+              "privacy-and-security",
+              "troubleshooting",
+              "faq",
+              "contributing"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/harshvasudeva/sync-it-up",
+          "icon": "github"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "https://github.com/harshvasudeva/sync-it-up/issues"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Install",
+      "href": "https://github.com/harshvasudeva/sync-it-up/releases/latest"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/harshvasudeva/sync-it-up"
+    }
+  }
+}

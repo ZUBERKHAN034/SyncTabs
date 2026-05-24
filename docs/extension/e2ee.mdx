@@ -1,0 +1,97 @@
+---
+title: End-to-end encryption
+description: Technical details on SyncTabs relay mode encryption using AES-GCM 256-bit with the Web Crypto API.
+icon: 'lock'
+---
+
+Relay mode uses **AES-GCM 256-bit** encryption via the browser-native Web Crypto API. No external crypto libraries are used.
+
+## Key generation
+
+A new key is generated using `crypto.subtle.generateKey`:
+
+```javascript
+const key = await crypto.subtle.generateKey(
+  { name: 'AES-GCM', length: 256 },
+  true,   // extractable
+  ['encrypt', 'decrypt']
+);
+```
+
+## Key export and import
+
+Keys are exported as raw bytes and encoded to a 64-character hex string for easy sharing:
+
+```javascript
+// Export: CryptoKey → hex string (64 chars)
+const raw = await crypto.subtle.exportKey('raw', key);
+const hexKey = Array.from(new Uint8Array(raw))
+  .map(b => b.toString(16).padStart(2, '0'))
+  .join('');
+
+// Import: hex string → CryptoKey
+const bytes = new Uint8Array(hexKey.match(/.{2}/g).map(h => parseInt(h, 16)));
+const key = await crypto.subtle.importKey(
+  'raw', bytes,
+  { name: 'AES-GCM', length: 256 },
+  true,
+  ['encrypt', 'decrypt']
+);
+```
+
+## Encryption
+
+Each message is encrypted with a random 96-bit IV (nonce):
+
+```javascript
+const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit nonce
+const encrypted = await crypto.subtle.encrypt(
+  { name: 'AES-GCM', iv },
+  key,
+  new TextEncoder().encode(plaintext)
+);
+// Result: { iv (12 bytes) | ciphertext + auth tag }
+```
+
+## Decryption
+
+The IV is prepended to the ciphertext. Decryption extracts it:
+
+```javascript
+const iv = encrypted.slice(0, 12);
+const ciphertext = encrypted.slice(12);
+const plaintext = await crypto.subtle.decrypt(
+  { name: 'AES-GCM', iv },
+  key,
+  ciphertext
+);
+```
+
+## Room ID derivation
+
+The room ID is derived from the secret key using SHA-256 to ensure both parties compute the same room without transmitting it:
+
+```javascript
+const hash = await crypto.subtle.digest('SHA-256', keyBytes);
+// Take first 8 bytes (16 hex chars) as room ID
+```
+
+## Security properties
+
+| Property | Value |
+|----------|-------|
+| Algorithm | AES-GCM |
+| Key size | 256 bits |
+| IV size | 96 bits (random per message) |
+| Authentication | GCM authentication tag (built-in) |
+| Key exchange | Manual (QR code or copy-paste) |
+| Forward secrecy | Not supported (shared key model) |
+| Key rotation | Manual — generate a new key and re-pair |
+
+## Threat model
+
+- **Relay operator**: sees encrypted blobs only — cannot read tab data
+- **Network observer**: sees encrypted WebSocket traffic — cannot decrypt
+- **Compromised key**: if the secret key is leaked, generate a new one and re-pair all browsers
+- **Replay attacks**: AES-GCM's authentication tag rejects tampered ciphertext
+- **IV reuse**: each message uses a cryptographically random IV (96 bits), making collision negligible

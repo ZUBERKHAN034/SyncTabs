@@ -1,0 +1,119 @@
+---
+title: Contributing
+description: Build SyncTabs from source, run the dev server, and contribute to the project.
+icon: 'code-branch'
+---
+
+## Repository
+
+[github.com/harshvasudeva/sync-it-up](https://github.com/harshvasudeva/sync-it-up)
+
+## Project structure
+
+```
+SyncTabs/
+├── extension/              # Browser extension (Manifest V3)
+│   ├── manifest.json       # Extension manifest
+│   ├── background.js       # Service worker: tab sync + WebSocket
+│   ├── e2ee.js             # AES-GCM 256-bit encryption module
+│   ├── popup.html/js/css   # Main popup UI
+│   ├── options.html/js/css # Settings page
+│   ├── onboarding.html/js  # First-install welcome
+│   ├── theme.js            # Dark/light/system theme
+│   └── icons/
+├── companion/              # Go companion app (production)
+│   ├── main.go             # Entry point
+│   ├── config/config.go    # Configuration management
+│   ├── server/             # HTTP/WS server, handlers, state
+│   ├── tray/               # System tray (per-platform)
+│   ├── startup/            # Auto-start registration (per-platform)
+│   └── logger/logger.go    # File + console logging
+├── server/                 # Node.js dev server (testing only)
+│   ├── server.js           # Development WebSocket server
+│   └── package.json
+├── relay/                  # E2EE relay server
+│   ├── server.js           # Room-based relay
+│   ├── portal/             # Mobile web portal
+│   └── Dockerfile
+└── safari/                 # Safari Web Extension wrapper
+```
+
+## Prerequisites
+
+- **Extension**: Chromium browser with Developer mode
+- **Companion**: [Go 1.21+](https://go.dev/dl/)
+- **Dev server**: Node.js 24 LTS
+- **Safari**: Xcode 14+, macOS 12+
+
+## Building the companion
+
+```bash
+cd companion
+
+# Windows
+GOOS=windows GOARCH=amd64 go build -ldflags "-H windowsgui" -o synctabs-companion-windows-amd64.exe .
+
+# macOS (Apple Silicon)
+GOOS=darwin GOARCH=arm64 go build -o synctabs-companion-darwin-arm64 .
+
+# macOS (Intel)
+GOOS=darwin GOARCH=amd64 go build -o synctabs-companion-darwin-amd64 .
+
+# Linux
+GOOS=linux GOARCH=amd64 go build -o synctabs-companion-linux-amd64 .
+```
+
+> macOS and Linux builds require CGo and must be compiled on the target OS (or via GitHub Actions).
+
+## Running the dev server
+
+Instead of the Go companion, you can use the Node.js dev server for extension development:
+
+```bash
+# Windows
+start-server.bat
+
+# macOS / Linux
+./start-server.sh
+```
+
+This installs dependencies and starts a dev WebSocket server on `localhost:9234`.
+
+## Loading the extension for development
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked** and select the `extension/` folder
+4. Make changes to the extension files
+5. Click the **reload** icon in the extension card to apply changes
+
+## Building the relay
+
+```bash
+cd relay
+npm install
+node server.js
+```
+
+Or with Docker:
+
+```bash
+cd relay
+docker build -t synctabs-relay .
+docker run -p 8765:8765 synctabs-relay
+```
+
+## Submitting changes
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request with a clear description
+
+## Reporting issues
+
+Open an issue at [github.com/harshvasudeva/sync-it-up/issues](https://github.com/harshvasudeva/sync-it-up/issues).
+
+## License
+
+MIT — see the [LICENSE](https://github.com/harshvasudeva/sync-it-up/blob/main/LICENSE) file.

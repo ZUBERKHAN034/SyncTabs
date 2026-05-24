@@ -1,0 +1,117 @@
+---
+title: HTTP API
+description: REST endpoints exposed by the SyncTabs companion for health checks, config, and status.
+icon: 'globe'
+---
+
+The companion exposes HTTP endpoints on the same port as the WebSocket server. All endpoints are restricted to localhost connections.
+
+<Note>
+All HTTP endpoints reject non-loopback connections with `403 Forbidden`.
+</Note>
+
+## Health check
+
+```
+GET /health
+```
+
+Returns server health and a summary of connected browsers.
+
+**Response:**
+
+```json
+{
+  "status": "ok",
+  "app": "synctabs-companion",
+  "browsers": {
+    "abc123": {
+      "browserName": "Chrome",
+      "tabCount": 12,
+      "online": true,
+      "lastSeen": "2026-05-24T10:30:00Z"
+    }
+  }
+}
+```
+
+## Configuration
+
+### Read config
+
+```
+GET /config
+```
+
+Returns the current companion configuration.
+
+**Response:**
+
+```json
+{
+  "port": 9234,
+  "dataFolder": "/home/user/.local/share/SyncTabs/data",
+  "logLevel": "info",
+  "maxTabsPerBrowser": 500,
+  "autoStart": false,
+  "version": "1.0.0",
+  "relayEnabled": false,
+  "relayUrl": "",
+  "relayRoomId": "",
+  "relaySecretKey": ""
+}
+```
+
+### Update config
+
+```
+POST /config
+```
+
+Send a partial JSON object to merge into the current configuration.
+
+**Request:**
+
+```json
+{
+  "logLevel": "debug"
+}
+```
+
+**Response:**
+
+```json
+{
+  "ok": true,
+  "config": { ... },
+  "restartNeeded": false
+}
+```
+
+<Warning>
+If `restartNeeded` is `true` (e.g., after changing the port), the companion will restart its server automatically after a brief delay.
+</Warning>
+
+## Status
+
+```
+GET /status
+```
+
+Returns server status and runtime information.
+
+**Response:**
+
+```json
+{
+  "status": "ok",
+  "app": "synctabs-companion",
+  "version": "1.0.0",
+  "uptimeSeconds": 3600,
+  "port": 9234,
+  "connections": 2,
+  "connectedBrowsers": ["Chrome", "Edge"],
+  "logLevel": "info",
+  "dataFolder": "/home/user/.local/share/SyncTabs/data"
+}
+```

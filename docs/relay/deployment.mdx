@@ -1,0 +1,105 @@
+---
+title: Relay deployment
+description: Deploy the SyncTabs relay server for E2E-encrypted cross-network tab sync.
+icon: 'cloud-arrow-up'
+---
+
+The relay server is a lightweight Node.js WebSocket server that forwards encrypted messages between browsers. It never decrypts or inspects tab data.
+
+## Prerequisites
+
+- Node.js 18+ 
+- A server reachable by all syncing browsers (VPS, cloud instance, etc.)
+
+## Quick start
+
+```bash
+cd relay
+npm install
+node server.js
+```
+
+The server starts on port `8765` by default. Set the `PORT` environment variable to change it:
+
+```bash
+PORT=443 node server.js
+```
+
+## Docker deployment
+
+A `Dockerfile` is included in the `relay/` directory:
+
+```bash
+cd relay
+docker build -t synctabs-relay .
+docker run -d -p 8765:8765 --name synctabs-relay synctabs-relay
+```
+
+Custom port:
+
+```bash
+docker run -d -p 443:443 -e PORT=443 --name synctabs-relay synctabs-relay
+```
+
+## Reverse proxy (recommended for production)
+
+Use Nginx or Caddy to terminate TLS and proxy to the relay:
+
+### Nginx example
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name relay.example.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+### Caddy example
+
+```
+relay.example.com {
+    reverse_proxy localhost:8765
+}
+```
+
+After the relay is deployed, configure your extension settings to use `wss://relay.example.com`.
+
+## Health check
+
+The relay exposes a `/health` endpoint:
+
+```bash
+curl https://relay.example.com/health
+```
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "app": "synctabs-relay",
+  "uptimeSeconds": 86400,
+  "rooms": 3,
+  "connections": 5
+}
+```
+
+## Security considerations
+
+- **Terminate TLS** with a reverse proxy — never run the relay over plain HTTP in production
+- The relay only sees encrypted blobs; it cannot read tab data
+- Rate limiting: 50 messages per 10 seconds per connection (configurable in source)
+- Maximum payload size: 512 KB per message
+- Consider adding HTTP basic auth or IP allowlisting at the reverse proxy level

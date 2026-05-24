@@ -1,0 +1,262 @@
+---
+title: Message types
+description: Reference for all WebSocket message types in the SyncTabs protocol.
+icon: 'list'
+---
+
+All messages between the extension, companion, and relay are JSON objects with a `type` field that determines the message kind.
+
+## Client → Server (inbound)
+
+### `register`
+
+Register a browser connection. Must be the first message sent after connecting.
+
+```json
+{
+  "type": "register",
+  "browserId": "abc123def456",
+  "browserName": "Chrome"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `browserId` | string | Yes | Unique identifier for the browser (generated on install) |
+| `browserName` | string | Yes | Display name (e.g., "Chrome", "Edge") |
+
+---
+
+### `tabs-update`
+
+Send the current list of open tabs for this browser.
+
+```json
+{
+  "type": "tabs-update",
+  "browserId": "abc123def456",
+  "browserName": "Chrome",
+  "tabs": [
+    {
+      "id": 1,
+      "title": "GitHub",
+      "url": "https://github.com",
+      "favIcon": "data:image/png;base64,...",
+      "active": true,
+      "pinned": false,
+      "windowId": 1,
+      "lastAccessed": 1708503600000,
+      "groupTitle": null,
+      "groupColor": null
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tabs` | array | Yes | Array of tab objects (max 500 per browser by default) |
+
+#### Tab object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | number | Browser tab ID |
+| `title` | string | Page title |
+| `url` | string | Page URL |
+| `favIcon` | string | Favicon (data URI or URL) |
+| `active` | boolean | Whether this is the currently active tab |
+| `pinned` | boolean | Whether the tab is pinned |
+| `windowId` | number | Window identifier |
+| `lastAccessed` | number | Last access timestamp (ms since epoch) |
+| `groupTitle` | string \| null | Tab group title |
+| `groupColor` | string \| null | Tab group color |
+
+---
+
+### `request-state`
+
+Request the full current state from the companion. Useful after reconnection.
+
+```json
+{
+  "type": "request-state",
+  "browserId": "abc123def456"
+}
+```
+
+---
+
+### `send-tab`
+
+Send a tab to a specific browser.
+
+```json
+{
+  "type": "send-tab",
+  "browserId": "abc123def456",
+  "targetBrowserId": "xyz789ghi012",
+  "tab": {
+    "url": "https://example.com",
+    "title": "Example",
+    "favIconUrl": "",
+    "pinned": false,
+    "groupTitle": null,
+    "groupColor": null
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `targetBrowserId` | string | Yes | Recipient browser ID |
+| `tab` | object | Yes | Tab payload to send |
+
+---
+
+### `update-global-sync-settings`
+
+Broadcast relay/E2EE settings to all connected browsers.
+
+```json
+{
+  "type": "update-global-sync-settings",
+  "browserId": "abc123def456",
+  "settings": {
+    "relayEnabled": true,
+    "relayUrl": "wss://relay.example.com",
+    "relayRoomId": "abc123",
+    "relaySecretKey": "64charhexkey..."
+  }
+}
+```
+
+---
+
+## Server → Client (outbound)
+
+### `full-state`
+
+Complete state of all browsers. Sent in response to `register` and `request-state`.
+
+```json
+{
+  "type": "full-state",
+  "browsers": {
+    "xyz789ghi012": {
+      "browserId": "xyz789ghi012",
+      "browserName": "Edge",
+      "tabs": [...],
+      "online": true,
+      "lastSeen": "2026-05-24T10:30:00Z"
+    }
+  }
+}
+```
+
+The requesting browser is excluded from the state.
+
+---
+
+### `browser-tabs-updated`
+
+Broadcast when a browser sends a `tabs-update`.
+
+```json
+{
+  "type": "browser-tabs-updated",
+  "browserId": "abc123def456",
+  "browserName": "Chrome",
+  "tabs": [...],
+  "lastSeen": "2026-05-24T10:30:00Z",
+  "online": true
+}
+```
+
+---
+
+### `presence`
+
+Broadcast when a browser connects or disconnects.
+
+```json
+{
+  "type": "presence",
+  "browserId": "abc123def456",
+  "browserName": "Chrome",
+  "online": true,
+  "lastSeen": "2026-05-24T10:30:00Z"
+}
+```
+
+---
+
+### `pending-tabs`
+
+Delivers queued tabs to a browser that just reconnected.
+
+```json
+{
+  "type": "pending-tabs",
+  "tabs": [
+    {
+      "url": "https://example.com",
+      "title": "Example",
+      "favIconUrl": "",
+      "pinned": false,
+      "groupTitle": null,
+      "groupColor": null,
+      "senderBrowserId": "abc123def456",
+      "senderBrowserName": "Chrome",
+      "sentAt": "2026-05-24T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### `send-tab-ack`
+
+Acknowledgement that a `send-tab` was processed.
+
+```json
+{
+  "type": "send-tab-ack",
+  "status": "delivered",
+  "targetBrowserId": "xyz789ghi012"
+}
+```
+
+The `status` field is either `"delivered"` (target was online) or `"queued"` (target was offline, tab saved for later).
+
+---
+
+### `global-sync-settings`
+
+Sent to a newly registered browser with the current relay config, or broadcast when settings change.
+
+```json
+{
+  "type": "global-sync-settings",
+  "settings": {
+    "relayEnabled": true,
+    "relayUrl": "wss://relay.example.com",
+    "relayRoomId": "abc123",
+    "relaySecretKey": "64charhexkey..."
+  }
+}
+```
+
+---
+
+### `error`
+
+Sent when a message is invalid or rate-limited.
+
+```json
+{
+  "type": "error",
+  "message": "Invalid browserId"
+}
+```

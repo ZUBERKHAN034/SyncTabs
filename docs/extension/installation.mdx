@@ -1,0 +1,53 @@
+---
+title: Extension installation
+description: Install the SyncTabs browser extension from a store or sideload it manually.
+icon: 'puzzle-piece'
+---
+
+## From browser stores (recommended)
+
+Installing from a store gives you automatic updates.
+
+| Browser | Store |
+|---------|-------|
+| Google Chrome | Chrome Web Store *(coming soon)* |
+| Microsoft Edge | Edge Add-ons *(coming soon)* |
+| Brave | Use the Chrome Web Store link |
+| Vivaldi | Use the Chrome Web Store link |
+| Opera | Use the Chrome Web Store link |
+
+Search for **"SyncTabs"** in your browser's extension store and click **Add**.
+
+## Sideload manually
+
+Use this method if the store isn't available or you want to run from source.
+
+1. Download or clone the repository
+2. Unzip and locate the `extension/` folder
+3. Open `chrome://extensions` in your browser
+4. Enable **Developer mode** (toggle in the top-right corner)
+5. Click **Load unpacked**
+6. Select the `extension/` folder
+7. Pin the SyncTabs icon to your toolbar
+
+> Repeat in every browser where you want tabs visible.
+
+## After installing
+
+The extension works immediately in **Local Mode** — your tabs are saved and visible in the popup.
+
+To sync tabs across browsers, follow the [getting started](/getting-started) guide to install the companion app.
+
+## Permissions
+
+The extension requests these permissions:
+
+| Permission | Why |
+|------------|-----|
+| `tabs` | Read open tab titles, URLs, and favicons |
+| `storage` | Save tab snapshots and preferences locally |
+| `alarms` | Periodic heartbeat to maintain companion connection |
+| `contextMenus` | Right-click menu items |
+| `http://127.0.0.1/*` | **Optional** — only when sync mode is enabled |
+
+All data stays on your machine. See [privacy and security](/privacy-and-security) for full details.

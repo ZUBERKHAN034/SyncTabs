@@ -1,0 +1,64 @@
+---
+title: Extension settings
+description: Configure the SyncTabs extension — sync toggle, server URL, localhost permission, relay settings, and more.
+icon: 'gear'
+---
+
+Open settings by clicking the **gear icon** in the popup, or right-click the toolbar icon → **Options**.
+
+## General settings
+
+| Setting | Description |
+|---------|-------------|
+| **Enable sync** | Toggle sync mode on or off |
+| **Server URL** | WebSocket URL for the companion (default: `ws://127.0.0.1:9234`) |
+| **Theme** | Choose `dark`, `light`, or `system` |
+
+## Localhost permission
+
+The extension needs permission to connect to `127.0.0.1`. This is an **optional** permission that is not requested at install time.
+
+1. Click **Grant localhost permission** in settings
+2. Confirm the browser permission prompt
+3. The extension can now connect to the companion
+
+If you revoke this permission, sync mode will stop working but local mode continues normally.
+
+## Connection testing
+
+Click **Test Connection** to verify the companion is reachable. A successful test shows a green indicator. If it fails:
+
+- Ensure the companion app is running
+- Check that the **Server URL** matches the companion's port
+- Verify localhost permission has been granted
+
+## Remote sync (relay) settings
+
+Scroll to the **Remote Sync** section in settings to configure E2E encrypted relay:
+
+| Setting | Description |
+|---------|-------------|
+| **Relay enabled** | Toggle relay mode |
+| **Relay URL** | WebSocket URL of your relay server (e.g., `wss://relay.example.com`) |
+| **Room ID** | Identifier for your sync group |
+| **Secret Key** | AES-256 encryption key (64-char hex) |
+
+### Generating keys
+
+Click **Generate Key** to create a new random 256-bit key. Click **Generate Room ID** to create a new room identifier.
+
+### QR code pairing
+
+Click the QR code icon next to the relay settings to display a scannable QR code containing all relay configuration. Scan this from another browser's settings page to pair instantly.
+
+## Clear cached data
+
+Click **Clear cached remote tab data** to remove all stored tab snapshots from other browsers. This does not affect your local tabs.
+
+## Changing the companion port
+
+If another app is using port `9234`:
+
+1. Edit the companion config file (see [companion configuration](/companion/configuration))
+2. Change the `port` value
+3. Update the **Server URL** in extension settings to match

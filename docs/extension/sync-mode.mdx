@@ -1,0 +1,51 @@
+---
+title: Sync mode
+description: Sync tabs across all your browsers in real time using the companion app on localhost.
+icon: 'arrows-rotate'
+---
+
+Sync mode connects the extension to the companion app running on your machine. All browsers on the same machine see each other's tabs in real time.
+
+## Prerequisites
+
+- The [companion app](/companion/installation) installed and running
+- Localhost permission granted in [extension settings](/extension/settings)
+
+## How it works
+
+1. The companion starts a WebSocket server on `127.0.0.1:9234` (configurable)
+2. Each browser extension connects to the companion via WebSocket
+3. When a tab changes, the extension sends a `tabs-update` message
+4. The companion broadcasts the update to all other connected browsers
+5. The companion persists current state to `tabs.json` so offline browsers remain visible
+
+## Connecting
+
+1. Start the companion app
+2. Open the SyncTabs popup in your browser
+3. The status dot should turn **green** (🟢) within a few seconds
+4. If it doesn't, go to **Settings → Test Connection**
+
+## What you can do
+
+- **View remote tabs** — each browser sees a card per other browser with online/offline status
+- **Open a remote tab** — click any tab to open it in your current browser
+- **Send a tab** — hover a tab to reveal the send button, which pushes it to another browser
+- **See offline browsers** — closed browsers still show their last session with a "last seen" timestamp
+
+## Status indicators
+
+| Dot | Meaning |
+|-----|---------|
+| 🟢 Green | Connected to companion, syncing |
+| 🟡 Yellow | Companion detected before but currently offline (cached data) |
+| ⚫ Grey | Local mode only, no companion detected |
+
+## Data flow
+
+All sync traffic stays on `127.0.0.1`. The companion never connects to the internet. Data is stored in plaintext JSON because it never leaves your machine.
+
+## Limitations
+
+- Sync mode only works between browsers on the **same machine** (localhost)
+- For cross-machine sync, use [relay mode](/extension/relay-mode) with end-to-end encryption

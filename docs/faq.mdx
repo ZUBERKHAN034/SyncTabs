@@ -1,0 +1,67 @@
+---
+title: FAQ
+description: Frequently asked questions about SyncTabs.
+icon: 'circle-question'
+---
+
+## Do I need an account?
+
+No. SyncTabs has no accounts, no sign-up, and no cloud services. Everything runs locally on your machine.
+
+## Does SyncTabs work on Chromebook?
+
+The extension works in **Local Mode** on Chromebook. Sync Mode is not currently supported because there is no ChromeOS companion build. Some Linux-enabled Chromebooks may be able to run the Linux companion experimentally.
+
+## Which browsers are supported?
+
+All Chromium-based browsers with extension support:
+- Google Chrome
+- Microsoft Edge
+- Brave
+- Vivaldi
+- Opera
+
+Safari is supported via a separate extension wrapper — see [Safari](/safari).
+
+Firefox is not currently supported (Manifest V3 differences).
+
+## Is my data sent to the cloud?
+
+No. In local and sync modes, all data stays on your machine. In relay mode, data is end-to-end encrypted before leaving your browser — the relay server only sees encrypted blobs.
+
+## Can I sync tabs between different machines?
+
+Yes, using **relay mode**. Deploy the [relay server](/relay/deployment), configure E2EE settings in the extension, and all your browsers on different networks can sync tabs.
+
+## How does tab persistence work?
+
+SyncTabs saves periodic snapshots of your open tabs to `chrome.storage.local` (local mode) or `tabs.json` via the companion (sync mode). When you reopen a browser, the last snapshot is restored, so you can still see tabs from a browser that's currently closed.
+
+## What happens when a browser is offline?
+
+- **Sync mode**: The companion marks the browser as offline and shows the last-known tabs. If someone sends a tab to the offline browser, it's queued (`pending-tabs.json`) and delivered when the browser reconnects.
+- **Local mode**: No sync occurs until the browser is open again.
+
+## Can I send a tab to another browser?
+
+Yes. In the popup, hover over a remote tab to reveal the **Send Tab** button. This pushes the tab to the target browser, even if it's currently offline.
+
+## How much data does the companion store?
+
+By default, up to 500 tabs per browser. This is configurable via `maxTabsPerBrowser` in the companion config.
+
+## Can I change the companion port?
+
+Yes. Edit `config.json` (see [configuration](/companion/configuration)) or use the HTTP API:
+
+```bash
+curl -X POST http://127.0.0.1:9234/config \
+  -H "Content-Type: application/json" \
+  -d '{"port": 9235}'
+```
+
+A restart is required after changing the port.
+
+## Is SyncTabs open source?
+
+Yes, MIT licensed. View the source at [github.com/harshvasudeva/sync-it-up](https://github.com/harshvasudeva/sync-it-up).

@@ -1,0 +1,99 @@
+---
+title: Privacy and security
+description: How SyncTabs handles your data, permissions, and security.
+icon: 'shield-halved'
+---
+
+SyncTabs is designed with a local-first, privacy-first philosophy. Your data stays on your machine.
+
+## TL;DR
+
+| Question | Answer |
+|----------|--------|
+| Do you collect personal data? | No |
+| Is data sent to the cloud? | No |
+| Do you sell data? | No |
+| Do you use tracking or analytics? | No |
+| Can I delete my data? | Yes, anytime |
+| Is my data encrypted? | Stays on your machine, so encryption isn't needed (except relay mode, which uses AES-256) |
+| Do you need an account? | No |
+
+## Data collection
+
+### What SyncTabs stores locally
+
+- **Tab information**: titles, URLs, favicons, active/pinned status, last accessed timestamps
+- **Settings**: your extension preferences, server connection settings, browser ID
+- **Browser ID**: a random identifier generated on first install, used only to correlate tabs across browsers
+
+### What SyncTabs does NOT collect
+
+- No personal information (name, email, address, phone)
+- No browsing history beyond currently open tabs
+- No search queries
+- No passwords or credentials
+- No location data
+- No IP addresses (unless you configure a non-localhost relay)
+- No analytics or tracking cookies
+
+## Permissions explained
+
+| Permission | Why it's needed |
+|------------|----------------|
+| `tabs` | Read open tab titles and URLs to display in the popup |
+| `storage` | Save tab snapshots and preferences locally |
+| `alarms` | Periodic heartbeat to maintain companion connection |
+| `contextMenus` | Right-click menu actions |
+| `http://127.0.0.1/*` | **Optional** — communicate with the companion on localhost |
+
+## Security model
+
+### Local mode
+
+- Data never leaves your browser
+- Stored in `chrome.storage.local`
+- No network communication
+
+### Sync mode
+
+- All communication is over `127.0.0.1` (localhost only)
+- The companion rejects connections from non-loopback addresses
+- Extension origins are validated (`chrome-extension://`, `edge-extension://`, etc.)
+- Content Security Policy prevents injection attacks
+- Data stored in plaintext JSON (doesn't leave your machine)
+
+### Relay mode
+
+- All tab data is encrypted with AES-GCM 256-bit before leaving the browser
+- The relay is a dumb forwarder — it never decrypts data
+- Authentication is via shared secret key (exchanged via QR code)
+- 96-bit random IV per message prevents nonce reuse
+- AES-GCM authentication tag detects any tampering
+- The relay sees metadata only (room ID, connection times, message sizes)
+
+## Data storage locations
+
+| Mode | Platform | Path |
+|------|----------|------|
+| **Local (extension)** | Windows | `%APPDATA%\Google\Chrome\User Data\Default\Local Storage\` |
+| | macOS | `~/Library/Application Support/Google/Chrome/Default/Local Storage/` |
+| | Linux | `~/.config/google-chrome/Default/Local Storage/` |
+| **Sync (companion)** | Windows | `%APPDATA%\SyncTabs\data\` |
+| | macOS | `~/Library/Application Support/SyncTabs/data/` |
+| | Linux | `~/.local/share/SyncTabs/data/` |
+
+## Deleting your data
+
+**Option 1**: Go to `chrome://extensions` → SyncTabs → Clear storage
+
+**Option 2**: Uninstall the extension
+
+**Option 3**: Manually delete the data directories listed above
+
+## Regulatory compliance
+
+SyncTabs complies with:
+
+- **GDPR** (General Data Protection Regulation) — no personal data is collected
+- **CCPA** (California Consumer Privacy Act) — no data is sold or shared
+- No data is transferred internationally (it stays local)

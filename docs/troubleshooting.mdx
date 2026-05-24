@@ -1,0 +1,94 @@
+---
+title: Troubleshooting
+description: Common issues and fixes for SyncTabs.
+icon: 'wrench'
+---
+
+## Status dot is grey (local mode)
+
+The companion is not running or the extension cannot reach it.
+
+**Fix:**
+1. Start the companion app
+2. Open extension settings and click **Test Connection**
+3. If it still fails, ensure the **Server URL** matches `ws://127.0.0.1:9234`
+4. Grant localhost permission in extension settings
+
+## Status dot is yellow (offline/cached)
+
+The companion was previously detected but is currently not running.
+
+**Fix:**
+1. Start the companion app
+2. Click **Test Connection** in extension settings
+3. Check that the companion port matches the extension's server URL
+
+## Windows SmartScreen warning
+
+The companion binary is unsigned, which triggers Windows SmartScreen.
+
+**Fix:** Click **More info → Run anyway**. The source code is publicly available for review on GitHub.
+
+## macOS "cannot be opened" warning
+
+macOS quarantines unsigned apps downloaded from the internet.
+
+**Fix:**
+
+```bash
+xattr -d com.apple.quarantine synctabs-companion-darwin-arm64
+```
+
+Then run the binary again.
+
+## Port already in use
+
+Another application is using the default port `9234`.
+
+**Fix:**
+1. Edit the companion config file (see [configuration](/companion/configuration))
+2. Change the `port` value to an available port (e.g., `9235`)
+3. Update the extension's **Server URL** to match: `ws://127.0.0.1:9235`
+4. Restart the companion
+
+## Tabs not updating in real time
+
+Chromium may suspend the extension's service worker when idle. The extension reconnects automatically, but there can be a brief delay.
+
+**Fix:** Click the refresh button in the popup, or reopen the popup. The extension sends a `request-state` message on each popup open.
+
+## Extension shows wrong browser name
+
+Some Chromium browsers (e.g., Brave) report as "Chrome" in their user-agent string. The browser ID is still unique, so sync works correctly — only the display name may be incorrect.
+
+## Companion tray icon not appearing
+
+On Linux, system tray support depends on your desktop environment.
+
+**Fix:**
+- Ensure a tray provider is running (e.g., `libappindicator` on GNOME)
+- On GNOME, you may need the `AppIndicator` extension
+- Run the companion with `synctabs-companion &` to run in the background
+
+## Relay mode not connecting
+
+**Check:**
+1. The relay server URL uses `wss://` (not `ws://`) if behind TLS
+2. The room ID and secret key match on all browsers
+3. The relay server is reachable from your network
+4. The relay's `/health` endpoint responds
+
+```bash
+curl https://your-relay.example.com/health
+```
+
+## Clearing data
+
+To clear all cached remote tabs:
+1. Open extension settings
+2. Click **Clear cached remote tab data**
+
+To reset everything:
+1. Uninstall the extension
+2. Delete the companion data directory (see [configuration](/companion/configuration))
+3. Reinstall

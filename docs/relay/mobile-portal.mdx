@@ -1,0 +1,41 @@
+---
+title: Mobile portal
+description: Access your tabs from a phone browser via the relay's mobile-friendly web portal.
+icon: 'mobile-screen'
+---
+
+The relay server includes a mobile-friendly web portal for viewing and sending tabs from your phone.
+
+## Accessing the portal
+
+Open the relay server URL in your phone's browser:
+
+```
+https://relay.example.com/portal/
+```
+
+## Pairing
+
+1. Open the SyncTabs extension settings on your desktop
+2. Scroll to **Remote Sync** and click the QR code icon
+3. Scan the QR code with your phone camera
+
+Or enter the settings manually:
+
+- **Relay URL**: `wss://relay.example.com`
+- **Room ID**: Your room identifier
+- **Secret Key**: Your 64-character hex encryption key
+
+## Features
+
+- **View all tabs** from your connected desktop browsers
+- **Send a tab** — enter a URL to push it to any connected browser
+- **Search tabs** by title or URL
+- **Tab status indicators** — see which browsers are online/offline
+
+## Security
+
+- All tab data displayed in the portal is decrypted locally in your phone's browser using the Web Crypto API
+- The secret key is stored in your phone's `sessionStorage` and is never sent to the relay
+- Closing the browser tab clears the key
+- The relay server never has access to unencrypted data

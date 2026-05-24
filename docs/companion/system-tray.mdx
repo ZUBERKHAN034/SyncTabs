@@ -1,0 +1,38 @@
+---
+title: System tray
+description: The companion system tray icon and menu options.
+icon: 'bars'
+---
+
+The companion runs in the background and appears as a system tray icon. Right-click the icon to access the menu.
+
+## Tray icon states
+
+| Icon | Meaning |
+|------|---------|
+| **Connected** (green) | One or more browsers connected |
+| **Disconnected** (grey/red) | No browsers connected |
+
+## Menu options
+
+| Menu item | Action |
+|-----------|--------|
+| **Status** | Shows the number of connected browsers |
+| **Open Data Folder** | Opens the data directory in your file manager |
+| **View Logs** | Opens the log file in a text editor |
+| **Restart Server** | Restarts the WebSocket server (useful after port changes) |
+| **Start with Windows** / **Start with Login** | Toggles auto-start on system boot |
+| **Settings...** | Note: configure via the extension options page |
+| **Quit** | Stops the companion completely |
+
+## Logs
+
+The companion writes logs to:
+
+| Platform | Log file |
+|----------|----------|
+| Windows | `%APPDATA%\SyncTabs\synctabs-companion.log` |
+| macOS | `~/Library/Application Support/SyncTabs/synctabs-companion.log` |
+| Linux | `~/.local/share/SyncTabs/synctabs-companion.log` |
+
+Set `logLevel` to `debug` in [configuration](/companion/configuration) for verbose output.

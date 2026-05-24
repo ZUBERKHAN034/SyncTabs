@@ -1,0 +1,50 @@
+---
+title: Safari extension
+description: Install SyncTabs as a Safari Web Extension on macOS.
+icon: 'compass'
+---
+
+SyncTabs includes a Safari extension wrapper built with Xcode. It wraps the Chromium extension's web content inside a native Safari Web Extension container.
+
+## Prerequisites
+
+- macOS 12+ (Monterey or later)
+- Xcode 14+
+- Apple Developer account (for distribution)
+
+## Building
+
+1. Open `safari/SyncTabs/SyncTabs.xcodeproj` in Xcode
+2. Select the **SyncTabs** target
+3. Build and run for local testing
+
+The project includes:
+- `AppDelegate.swift` — macOS app delegate
+- `ViewController.swift` — main window controller
+- `Resources/Script.js` — Safari-specific extension script
+- `Resources/Style.css` — Safari-specific styles
+
+## Installing locally
+
+1. Build the project in Xcode
+2. The Safari extension will appear in Safari → Preferences → Extensions
+3. Enable the SyncTabs extension
+4. Grant necessary permissions when prompted
+
+## Differences from Chromium
+
+Safari Web Extensions have some limitations:
+
+- **Content script behavior** may differ from Chrome
+- **Service worker lifecycle** is managed differently in Safari
+- **Localhost permission** workflow differs — Safari may handle the permission prompt differently
+
+## Distribution
+
+To distribute via the Mac App Store:
+
+1. Sign the app with your Apple Developer certificate
+2. Submit through App Store Connect
+3. The extension will be available as a Safari Web Extension
+
+For sideloading (development), use Xcode's built-in run workflow.

@@ -1,0 +1,46 @@
+---
+title: WebSocket protocol
+description: The WebSocket message protocol used between the browser extension and companion/relay.
+icon: 'plug'
+---
+
+The extension communicates with the companion (sync mode) and relay server (relay mode) over WebSocket connections. All messages are JSON.
+
+## Connection
+
+| Mode | URL | Protocol |
+|------|-----|----------|
+| Sync mode | `ws://127.0.0.1:9234` | WebSocket |
+| Relay mode | `wss://relay.example.com` | WebSocket (TLS) |
+
+The companion only accepts connections from loopback addresses (`127.0.0.1`, `::1`) and browser extension origins (`chrome-extension://`, `edge-extension://`, etc.).
+
+## Message flow
+
+```
+Extension                          Companion
+    │                                  │
+    │──── register ───────────────────►│
+    │◄─── full-state ─────────────────│
+    │◄─── global-sync-settings ────────│
+    │                                  │
+    │──── tabs-update ────────────────►│  (on tab change)
+    │◄─── browser-tabs-updated ───────│  (broadcast to others)
+    │                                  │
+    │──── send-tab ───────────────────►│
+    │◄─── send-tab-ack ────────────────│
+    │                                  │
+    │──── request-state ──────────────►│
+    │◄─── full-state ─────────────────│
+    │                                  │
+    │◄─── presence (online/offline) ───│  (from other browsers)
+    │◄─── pending-tabs ────────────────│  (queued tabs)
+```
+
+## Rate limiting
+
+- **Companion**: 50 messages per 10 seconds per connection
+- **Relay**: 50 messages per 10 seconds per connection
+- **Max message size**: 512 KB
+
+Connections exceeding limits receive an error message and may be closed.

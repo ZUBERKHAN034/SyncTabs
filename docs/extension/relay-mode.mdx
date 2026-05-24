@@ -1,0 +1,70 @@
+---
+title: Relay mode (E2E encrypted)
+description: Sync tabs across networks with end-to-end encryption via a relay server.
+icon: 'shield-halved'
+---
+
+Relay mode enables cross-network tab sync with end-to-end encryption. Tab data is encrypted in the browser before it reaches the relay — the relay only forwards encrypted blobs and can never read your data.
+
+## How it works
+
+1. Two or more browsers share a secret key (exchanged via QR code or manual input)
+2. Each browser encrypts tab data using AES-GCM 256-bit (Web Crypto API)
+3. Encrypted data is sent to the relay server inside a named room
+4. The relay forwards messages to other clients in the same room
+5. Receiving browsers decrypt with the same shared key
+
+The relay is a **dumb forwarder** — it never has access to unencrypted tab data.
+
+## Setting up relay mode
+
+### 1. Deploy the relay server
+
+See the [relay deployment](/relay/deployment) guide for Docker or bare-metal setup.
+
+### 2. Configure the companion
+
+Open [extension settings](/extension/settings) and scroll to **Remote Sync**:
+
+1. Enable **Relay Mode**
+2. Enter the relay server URL (e.g., `wss://relay.example.com`)
+3. Enter or generate a **Room ID** — this identifies your sync group
+4. Enter or generate a **Secret Key** — this is the AES-256 encryption key
+
+### 3. Pair another browser
+
+On the first browser, click the QR code icon next to the relay settings. Scan the QR code with your other browser (or copy the settings manually).
+
+### 4. Verify
+
+The status indicator should show **green with a relay badge** when connected.
+
+## Encryption details
+
+<Info>
+All encryption uses the browser-native **Web Crypto API** — no external libraries.
+
+- **Algorithm**: AES-GCM
+- **Key size**: 256 bits
+- **IV**: 96-bit random nonce per message
+- **Key format**: 64-character hex string (32 bytes)
+- **Room ID**: Derived from the key using SHA-256
+</Info>
+
+See [E2EE details](/extension/e2ee) for the full technical breakdown.
+
+## Mobile portal
+
+The relay serves a mobile-friendly web portal. Open the relay URL in your phone's browser, enter the room ID and key, and you can:
+
+- View all tabs from your desktop browsers
+- Send a URL back to any connected browser
+
+See [mobile portal](/relay/mobile-portal) for details.
+
+## Security considerations
+
+- The secret key is the only thing protecting your data — keep it safe
+- If the key is compromised, generate a new one and re-pair all browsers
+- The relay sees metadata (room ID, connection times, message sizes) but not content
+- Rate limiting on the relay prevents abuse (50 messages per 10 seconds per connection)

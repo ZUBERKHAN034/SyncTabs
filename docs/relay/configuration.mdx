@@ -1,0 +1,54 @@
+---
+title: Relay configuration
+description: Configuration options for the SyncTabs relay server.
+icon: 'sliders'
+---
+
+The relay server is configured via environment variables.
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8765` | Port the relay server listens on |
+| `MAX_PAYLOAD` | `524288` (512 KB) | Maximum WebSocket message size in bytes |
+| `RATE_WINDOW_MS` | `10000` | Rate limit time window in milliseconds |
+| `RATE_MAX_MESSAGES` | `50` | Maximum messages per window per connection |
+
+## Setting environment variables
+
+```bash
+# Direct
+PORT=443 RATE_MAX_MESSAGES=100 node server.js
+
+# Docker
+docker run -e PORT=443 -e RATE_MAX_MESSAGES=100 synctabs-relay
+```
+
+## Rate limiting
+
+The relay enforces per-connection rate limits:
+
+- **Window**: 10 seconds (configurable via `RATE_WINDOW_MS`)
+- **Max messages**: 50 per window (configurable via `RATE_MAX_MESSAGES`)
+- **Max payload**: 512 KB per message (configurable via `MAX_PAYLOAD`)
+
+Exceeding limits results in the connection being closed.
+
+## Room model
+
+The relay uses a room-based model:
+
+1. Browsers connect and join a room identified by the room ID
+2. Messages are forwarded to all other connections in the same room
+3. The relay never decrypts messages — it only sees encrypted blobs
+4. When all clients in a room disconnect, the room is cleaned up
+
+## Logging
+
+The relay logs connection events to stdout:
+
+```
+[+] Room abc123: client joined (2 total)
+[-] Room abc123: client left (1 total)
+```

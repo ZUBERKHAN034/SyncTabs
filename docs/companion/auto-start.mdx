@@ -1,0 +1,41 @@
+---
+title: Auto-start on boot
+description: Configure the companion to start automatically when you log in.
+icon: 'rocket'
+---
+
+The companion can start automatically on system boot so you don't need to launch it manually.
+
+## Enabling auto-start
+
+### Via tray menu
+
+Right-click the companion tray icon and select:
+
+- **Windows**: **Start with Windows**
+- **macOS**: **Start with Login**
+- **Linux**: **Start on Boot**
+
+### Via HTTP API
+
+```bash
+curl -X POST http://127.0.0.1:9234/config \
+  -H "Content-Type: application/json" \
+  -d '{"autoStart": true}'
+```
+
+### Via config file
+
+Edit the companion's `config.json` and set `"autoStart": true`, then restart the companion.
+
+## Platform implementation
+
+| Platform | How it works |
+|----------|-------------|
+| **Windows** | Creates a registry key at `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
+| **macOS** | Registers as a login item via `osascript` |
+| **Linux** | Creates a `.desktop` file in `~/.config/autostart/` |
+
+## Disabling auto-start
+
+Use the same methods as enabling — toggle the setting off via the tray menu, API, or config file.

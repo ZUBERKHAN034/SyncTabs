@@ -1,0 +1,37 @@
+---
+title: Local mode
+description: Use SyncTabs without any server — view and manage your own tabs with zero setup.
+icon: 'hard-drive'
+---
+
+Local mode is the default. It requires no server, no companion, and no configuration.
+
+## What you get
+
+- **View all your tabs** across windows with favicons, pinned/active indicators
+- **Tabs grouped by window** — collapse and expand each window
+- **Tab persistence** — tabs survive browser restarts via snapshots saved to `chrome.storage.local`
+- **Search** — filter tabs by title or URL
+- **Close tabs** from the popup without switching windows
+
+## How it works
+
+The extension reads your browser's tab list using the Chrome Tabs API and saves periodic snapshots to local storage. When you reopen the browser, the last snapshot is restored.
+
+No data leaves your browser in local mode.
+
+## Limitations
+
+In local mode you **cannot**:
+
+- See tabs from other browsers
+- Send tabs between browsers
+- Use real-time sync
+
+To unlock these features, switch to [sync mode](/extension/sync-mode) or [relay mode](/extension/relay-mode).
+
+## Status indicator
+
+The popup shows a **grey dot** (⚫) in the header when running in local mode. This means the companion is not detected.
+
+To enable sync, install the [companion app](/companion/installation) and grant localhost permission in extension settings.

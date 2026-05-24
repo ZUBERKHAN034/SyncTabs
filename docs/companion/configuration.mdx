@@ -1,0 +1,82 @@
+---
+title: Companion configuration
+description: Configure the SyncTabs companion — port, data folder, log level, and relay settings.
+icon: 'sliders'
+---
+
+The companion reads its configuration from a JSON file. On first run, it creates default config at the platform-specific path:
+
+| Platform | Config path |
+|----------|------------|
+| Windows | `%APPDATA%\SyncTabs\config.json` |
+| macOS | `~/Library/Application Support/SyncTabs/config.json` |
+| Linux | `~/.local/share/SyncTabs/config.json` |
+
+## Configuration file
+
+```json
+{
+  "port": 9234,
+  "dataFolder": "%APPDATA%/SyncTabs/data",
+  "logLevel": "info",
+  "maxTabsPerBrowser": 500,
+  "autoStart": false,
+  "version": "1.0.0",
+  "relayEnabled": false,
+  "relayUrl": "",
+  "relayRoomId": "",
+  "relaySecretKey": ""
+}
+```
+
+## Settings reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `port` | int | `9234` | WebSocket server port. Valid range: 1024–65535. Requires restart. |
+| `dataFolder` | string | Platform-specific | Directory for `tabs.json` and `pending-tabs.json` |
+| `logLevel` | string | `"info"` | Log verbosity: `debug`, `info`, `warn`, `error` |
+| `maxTabsPerBrowser` | int | `500` | Maximum tabs stored per browser. Range: 1–10000. |
+| `autoStart` | bool | `false` | Launch on system startup |
+| `version` | string | — | Read-only. Auto-set to current companion version. |
+| `relayEnabled` | bool | `false` | Enable E2E relay sync |
+| `relayUrl` | string | `""` | Relay server WebSocket URL |
+| `relayRoomId` | string | `""` | Room identifier for relay sync |
+| `relaySecretKey` | string | `""` | AES-256 encryption key for relay |
+
+## Editing config
+
+### Via the extension
+
+Open extension settings and configure relay settings. The companion broadcasts relay config changes to all connected browsers.
+
+### Via HTTP API
+
+```bash
+# Read current config
+curl http://127.0.0.1:9234/config
+
+# Update a setting
+curl -X POST http://127.0.0.1:9234/config \
+  -H "Content-Type: application/json" \
+  -d '{"logLevel": "debug"}'
+```
+
+### Manually
+
+Edit `config.json` with a text editor, then restart the companion.
+
+<Warning>
+Changing the `port` field requires a companion restart. Other fields (log level, auto-start, relay settings) are applied immediately via hot-reload.
+</Warning>
+
+## Data files
+
+The companion stores these files in the data folder:
+
+| File | Purpose |
+|------|---------|
+| `tabs.json` | Current tab state for each browser (persisted across restarts) |
+| `pending-tabs.json` | Queue of tabs waiting for offline browsers |
+| `../config.json` | Configuration (parent directory) |
+| `../synctabs-companion.log` | Application log (parent directory) |

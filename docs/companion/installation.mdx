@@ -1,0 +1,79 @@
+---
+title: Companion installation
+description: Install the SyncTabs companion app on Windows, macOS, or Linux for cross-browser tab sync.
+icon: 'desktop'
+---
+
+The companion is a lightweight Go binary (~10 MB) that runs a WebSocket server on `127.0.0.1`. It **never connects to the internet**.
+
+## Download
+
+Download the latest release from [GitHub Releases](https://github.com/harshvasudeva/sync-it-up/releases/latest):
+
+| Platform | File |
+|----------|------|
+| Windows | `synctabs-companion-windows-amd64.exe` |
+| macOS (Apple Silicon) | `synctabs-companion-darwin-arm64` |
+| macOS (Intel) | `synctabs-companion-darwin-amd64` |
+| Linux (x64) | `synctabs-companion-linux-amd64` |
+| Linux (.deb) | `synctabs-companion_<version>_amd64.deb` |
+
+## Installation by platform
+
+<Tabs>
+  <Tab title="Windows">
+    1. Download `synctabs-companion-windows-amd64.exe`
+    2. Double-click to run — a tray icon appears in your taskbar
+    3. Right-click the tray icon → **Start with Windows** to auto-start on login
+
+    > Windows SmartScreen may show a warning because the binary is unsigned. Click **More info → Run anyway**. The source code is public for review.
+  </Tab>
+  <Tab title="macOS">
+    ```bash
+    # Make executable
+    chmod +x synctabs-companion-darwin-arm64
+
+    # Remove quarantine (required for unsigned apps)
+    xattr -d com.apple.quarantine synctabs-companion-darwin-arm64
+
+    # Run
+    ./synctabs-companion-darwin-arm64
+    ```
+
+    A tray icon appears in your menu bar. Right-click → **Start with Login** to auto-start.
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    # Option A: .deb package (Ubuntu/Debian)
+    sudo dpkg -i synctabs-companion_<version>_amd64.deb
+    synctabs-companion &
+
+    # Option B: Direct binary
+    chmod +x synctabs-companion-linux-amd64
+    ./synctabs-companion-linux-amd64 &
+    ```
+  </Tab>
+</Tabs>
+
+## Verify it's running
+
+After starting the companion:
+
+1. Open the SyncTabs popup in your browser
+2. The status dot should turn **green** (🟢) within a few seconds
+3. If not, go to extension settings and click **Test Connection**
+
+## Alternative: development server
+
+For extension development, you can use the Node.js dev server instead:
+
+```bash
+# Requires Node.js 24 LTS
+# Windows
+start-server.bat
+
+# macOS / Linux
+./start-server.sh
+```
+
+This starts a dev WebSocket server on `localhost:9234`. Note that the Go companion is recommended for production use.
